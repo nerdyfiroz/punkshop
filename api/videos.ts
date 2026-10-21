@@ -4,7 +4,6 @@ import {
   deleteR2Object,
   isR2Configured,
   ALLOWED_MIME_TYPES,
-  MAX_SINGLE_FILE_SIZE_BYTES,
   STORAGE_CEILING_BYTES,
 } from './r2-client';
 import { isAdminAuthorized } from './auth-util';
@@ -111,13 +110,6 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({
           success: false,
           message: `Invalid MIME type: ${contentType}. Allowed formats: MP4 (video/mp4), WebM (video/webm), MOV (video/quicktime), JPEG, PNG, WebP.`,
-        });
-      }
-
-      if (fileSize > MAX_SINGLE_FILE_SIZE_BYTES) {
-        return res.status(400).json({
-          success: false,
-          message: `Single file exceeds 500 MB limit (${(fileSize / (1024 * 1024)).toFixed(1)} MB requested).`,
         });
       }
 

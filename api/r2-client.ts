@@ -21,7 +21,6 @@ export const R2_SECRET_ACCESS_KEY = cleanStr(rawSecretAccessKey);
 export const R2_BUCKET = cleanStr(rawBucket) || 'punkshop';
 
 // Safety Limits
-export const MAX_SINGLE_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB single file limit
 export const STORAGE_CEILING_BYTES = 9 * 1024 * 1024 * 1024; // 9 GB internal safety ceiling
 export const FREE_TIER_LIMIT_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB Cloudflare R2 standard free allowance
 
@@ -60,6 +59,7 @@ export function getR2Client(): S3Client | null {
 /**
  * Creates a presigned PUT upload URL for direct browser-to-R2 upload.
  * Large video binaries never pass through Vercel serverless request bodies.
+ * No single file size limit - supports full-size HD videos and movies.
  */
 export async function createPresignedUploadUrl(params: {
   filename: string;
@@ -78,13 +78,6 @@ export async function createPresignedUploadUrl(params: {
   if (!ALLOWED_MIME_TYPES.includes(params.contentType.toLowerCase())) {
     throw new Error(
       `Unsupported MIME type: ${params.contentType}. Allowed types: MP4, WebM, MOV, JPEG, PNG, WebP.`
-    );
-  }
-
-  // Validate single file size limit (500 MB)
-  if (params.fileSize > MAX_SINGLE_FILE_SIZE_BYTES) {
-    throw new Error(
-      `File size exceeds 500 MB limit (${(params.fileSize / (1024 * 1024)).toFixed(1)} MB requested).`
     );
   }
 

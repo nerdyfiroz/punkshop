@@ -179,16 +179,6 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
       return;
     }
 
-    // Validate 500 MB single file limit
-    const MAX_SINGLE_FILE = 500 * 1024 * 1024;
-    if (file.size > MAX_SINGLE_FILE) {
-      setUploadError(
-        `File exceeds 500 MB single file limit (${(file.size / (1024 * 1024)).toFixed(1)} MB). Please select a file under 500 MB.`
-      );
-      setSelectedFile(null);
-      return;
-    }
-
     // Check storage ceiling
     if (storage && storage.totalBytes + file.size > storage.storageCeilingBytes) {
       setUploadError(
@@ -596,7 +586,7 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
                 Total Videos: <strong className="text-white">{storage?.videoCount || videos.length}</strong>
               </span>
               <span>
-                Max File Size: <strong className="text-white">500 MB</strong>
+                File Size Limit: <strong className="text-emerald-400">No Limit</strong>
               </span>
               <span>
                 Egress Fee: <strong className="text-emerald-400">$0.00 (Zero Egress Fees)</strong>
@@ -718,7 +708,7 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
                 )}
               </div>
               <p className="text-xs text-zinc-500">
-                Supports MP4, WebM, MOV &bull; Single file limit: 500 MB &bull; Direct R2 PUT
+                Supports MP4, WebM, MOV &bull; No File Size Limit &bull; Direct R2 PUT
               </p>
               {selectedFile && (
                 <div className="mt-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-mono font-bold border border-amber-500/20">

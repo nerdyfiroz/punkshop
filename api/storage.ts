@@ -3,7 +3,6 @@ import {
   R2_BUCKET,
   STORAGE_CEILING_BYTES,
   FREE_TIER_LIMIT_BYTES,
-  MAX_SINGLE_FILE_SIZE_BYTES,
 } from './r2-client';
 import { getTotalStorageBytes } from './video-db';
 
@@ -46,8 +45,7 @@ export default async function handler(req: any, res: any) {
       formattedCeiling: '9.00 GB',
       freeTierLimitBytes: FREE_TIER_LIMIT_BYTES,
       formattedFreeTier: '10.00 GB',
-      maxSingleFileSizeBytes: MAX_SINGLE_FILE_SIZE_BYTES,
-      formattedMaxSingleFile: '500 MB',
+      formattedMaxSingleFile: 'No limit',
       remainingBytes,
       formattedRemaining: `${(remainingBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
       percentOfCeiling: Number(percentOfCeiling.toFixed(1)),

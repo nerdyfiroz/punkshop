@@ -15,7 +15,7 @@ Cloudflare R2 Standard includes the following monthly allowances **at $0.00 cost
 | **Class B Operations** (Streams, Downloads) | **10,000,000 requests/month** free | Well within free tier |
 | **Data Egress (Bandwidth)** | **$0.00 / Free (Zero Egress Fees)** | Unlimited bandwidth within free tier |
 
-> **Safety Ceiling Note:** PunkShop enforces an internal **9.00 GB storage ceiling** and a **500 MB single-file upload limit**. Once 9 GB is reached, new uploads are automatically blocked until older files are removed, preventing unintended charges.
+> **Safety Ceiling Note:** PunkShop enforces an internal **9.00 GB storage ceiling** with **no single-file size limit** (you can upload full-length high-definition movies and series). Once the 9 GB total library ceiling is reached, new uploads are blocked until older files are removed, preventing unintended charges.
 
 ---
 
@@ -147,7 +147,7 @@ Direct uploads from the administrator's browser directly to Cloudflare R2 requir
 
 - [x] **Direct R2 Uploads:** Video binaries upload directly from the browser to Cloudflare R2 without passing through Vercel serverless request bodies.
 - [x] **Admin Authentication:** Server-side authentication with rate limiting and signed `HttpOnly` session cookies. Admin credentials are never stored in client code.
-- [x] **Cost Controls & Storage Meter:** Real-time visual gauge monitoring the 9 GB internal safety ceiling and 500 MB single-file limit.
+- [x] **Cost Controls & Storage Meter:** Real-time visual gauge monitoring the 9 GB internal safety ceiling with no arbitrary single-file limit.
 - [x] **Video Streaming:** HTML5 player with play/pause, volume, fullscreen, speed, theater mode, and seekable HTTP Range request support.
 - [x] **Direct Downloads:** Signed download URLs with safe `attachment; filename="..."` Content-Disposition headers.
 - [x] **Metadata Management:** Edit video title, description, category, and thumbnail.
