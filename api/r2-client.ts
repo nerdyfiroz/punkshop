@@ -184,3 +184,7 @@ export async function deleteR2Object(objectKey: string): Promise<void> {
     })
   );
 }
+
+export default async function handler(_req: any, res: any) {
+  return res.status(404).json({ message: 'R2 utility module' });
+}

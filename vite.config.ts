@@ -65,7 +65,7 @@ function apiDevServerPlugin() {
           }
 
           // Dynamically load the TypeScript API handler
-          const modulePath = path.resolve(__dirname, `api/${routeName}.ts`);
+          const modulePath = path.resolve(process.cwd(), `api/${routeName}.ts`);
           const mod = await server.ssrLoadModule(modulePath);
           const handler = mod.default || mod;
 
@@ -93,7 +93,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), apiDevServerPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(process.cwd(), '.'),
       },
     },
     define: {

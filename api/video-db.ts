@@ -308,3 +308,7 @@ export async function getTotalStorageBytes(): Promise<{ totalBytes: number; vide
   const totalBytes = list.reduce((acc, curr) => acc + (curr.sizeBytes || 0), 0);
   return { totalBytes, videoCount: list.length };
 }
+
+export default async function handler(_req: any, res: any) {
+  return res.status(404).json({ message: 'Video DB utility module' });
+}

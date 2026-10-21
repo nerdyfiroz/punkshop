@@ -220,3 +220,7 @@ export function buildSessionCookie(token: string, maxAgeSec: number = 86400): st
 export function buildClearSessionCookie(): string {
   return `punkshop_admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
+
+export default async function handler(_req: any, res: any) {
+  return res.status(404).json({ message: 'Auth utility module' });
+}

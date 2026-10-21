@@ -42,3 +42,7 @@ export async function getDb() {
   if (!c) return null;
   return c.db();
 }
+
+export default async function handler(_req: any, res: any) {
+  return res.status(404).json({ message: 'Database utility module' });
+}
