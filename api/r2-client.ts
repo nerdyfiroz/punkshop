@@ -90,7 +90,6 @@ export async function createPresignedUploadUrl(params: {
     Bucket: R2_BUCKET,
     Key: objectKey,
     ContentType: params.contentType,
-    ContentLength: params.fileSize,
   });
 
   // Presigned URL valid for 15 minutes (900 seconds)

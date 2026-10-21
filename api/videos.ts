@@ -139,9 +139,10 @@ export default async function handler(req: any, res: any) {
           ...uploadResult,
         });
       } catch (err: any) {
+        console.error('Presigned URL error:', err);
         return res.status(500).json({
           success: false,
-          message: err.message || 'Failed to create presigned upload URL',
+          message: `Cloudflare R2 Error: ${err.message || 'Failed to create presigned upload URL'}`,
         });
       }
     }

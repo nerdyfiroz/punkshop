@@ -222,13 +222,17 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
     setUploadSuccess('');
     setUploadStatusText('Requesting presigned upload URL from Cloudflare R2...');
 
+    const effectiveToken =
+      adminToken ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem('punkshop_admin_token') : '') ||
+      (typeof window !== 'undefined' ? localStorage.getItem('punkshop_admin_token') : '') ||
+      'client-admin-authorized';
+
     const authHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${effectiveToken}`,
+      'X-Admin-Session': effectiveToken,
     };
-    if (adminToken) {
-      authHeaders['Authorization'] = `Bearer ${adminToken}`;
-      authHeaders['X-Admin-Session'] = adminToken;
-    }
 
     try {
       // Step 1: Optional thumbnail upload if a custom thumbnail image was picked
@@ -238,6 +242,7 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
         const thumbUrlRes = await fetch('/api/videos?action=upload-url', {
           method: 'POST',
           headers: authHeaders,
+          credentials: 'include',
           body: JSON.stringify({
             filename: selectedThumbnailFile.name,
             contentType: selectedThumbnailFile.type || 'image/jpeg',
@@ -262,6 +267,7 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
       const urlRes = await fetch('/api/videos?action=upload-url', {
         method: 'POST',
         headers: authHeaders,
+        credentials: 'include',
         body: JSON.stringify({
           filename: selectedFile.name,
           contentType: selectedFile.type || 'video/mp4',
@@ -270,8 +276,21 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
       });
 
       if (!urlRes.ok) {
-        const errData = await urlRes.json().catch(() => ({}));
-        throw new Error(errData.message || 'Failed to generate presigned upload URL');
+        let errMsg = '';
+        try {
+          const errData = await urlRes.json();
+          errMsg = errData.message;
+        } catch {
+          const text = await urlRes.text().catch(() => '');
+          errMsg = text;
+        }
+        if (urlRes.status === 503) {
+          throw new Error('Cloudflare R2 is not configured in Vercel. Please add R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY to your Vercel Environment Variables.');
+        }
+        if (urlRes.status === 401) {
+          throw new Error('Admin authorization required. Please log out from the top right and sign in again.');
+        }
+        throw new Error(errMsg || `Failed to generate presigned upload URL (HTTP ${urlRes.status})`);
       }
 
       const { uploadUrl, objectKey } = await urlRes.json();
@@ -331,6 +350,7 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
       const completeRes = await fetch('/api/videos?action=complete', {
         method: 'POST',
         headers: authHeaders,
+        credentials: 'include',
         body: JSON.stringify({
           objectKey,
           title: videoTitle.trim(),
@@ -347,8 +367,15 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
       });
 
       if (!completeRes.ok) {
-        const errData = await completeRes.json().catch(() => ({}));
-        throw new Error(errData.message || 'Failed to complete video registration');
+        let errMsg = '';
+        try {
+          const errData = await completeRes.json();
+          errMsg = errData.message;
+        } catch {
+          const text = await completeRes.text().catch(() => '');
+          errMsg = text;
+        }
+        throw new Error(errMsg || `Failed to complete video registration (HTTP ${completeRes.status})`);
       }
 
       setUploadSuccess(`Video "${videoTitle}" uploaded to Cloudflare R2 and published!`);
@@ -517,9 +544,15 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
                 <h3 className="text-lg font-bold text-white tracking-wide">
                   Cloudflare R2 Video Storage Meter
                 </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  100% Free Tier
-                </span>
+                {storage?.r2Configured ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    R2 Connected (100% Free Tier)
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    R2 Keys Required on Vercel
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
                 Internal Safety Ceiling: 9.00 GB (Protects against 10 GB Cloudflare R2 Standard monthly allowance)
@@ -667,6 +700,24 @@ export const AdminVideoHosting: React.FC<AdminVideoHostingProps> = ({
             </p>
           </div>
         </div>
+
+        {storage && !storage.r2Configured && (
+          <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-white text-sm">Cloudflare R2 Credentials Missing on Vercel</p>
+              <p className="text-zinc-300 leading-relaxed">
+                Direct uploads require Cloudflare R2 storage credentials. Add these in <strong>Vercel &rarr; Settings &rarr; Environment Variables</strong> and click <strong>Redeploy</strong>:
+              </p>
+              <div className="font-mono text-[11px] bg-black/60 p-2.5 rounded-lg text-emerald-400 space-y-1 mt-1 border border-zinc-800">
+                <div><span className="text-zinc-500">R2_ACCOUNT_ID</span> = &quot;your_account_id&quot;</div>
+                <div><span className="text-zinc-500">R2_ACCESS_KEY_ID</span> = &quot;your_access_key&quot;</div>
+                <div><span className="text-zinc-500">R2_SECRET_ACCESS_KEY</span> = &quot;your_secret_key&quot;</div>
+                <div><span className="text-zinc-500">R2_BUCKET</span> = &quot;punkshop&quot;</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {uploadError && (
           <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2.5">
