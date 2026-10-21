@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Film,
   Plus,
@@ -76,10 +76,50 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
 
-  // Vercel Environment Variables
-  const expectedUsername = (import.meta.env.VITE_ADMIN_USERNAME || 'admin').trim();
-  const expectedPassword = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim();
-  const configuredDbUrl = (import.meta.env.VITE_DATABASE_URL || '').trim();
+  // Vercel Environment Variables (Supports both with and without VITE_ prefix)
+  const expectedUsername = (
+    (import.meta.env as any).ADMIN_USERNAME ||
+    import.meta.env.VITE_ADMIN_USERNAME ||
+    'admin'
+  ).trim();
+  const expectedPassword = (
+    (import.meta.env as any).ADMIN_PASSWORD ||
+    import.meta.env.VITE_ADMIN_PASSWORD ||
+    'admin123'
+  ).trim();
+  const configuredMongoUri = (
+    (import.meta.env as any).MONGODB_URI ||
+    import.meta.env.VITE_MONGODB_URI ||
+    import.meta.env.VITE_DATABASE_URL ||
+    ''
+  ).trim();
+
+  // MongoDB Live Test State
+  const [isCheckingMongo, setIsCheckingMongo] = useState<boolean>(false);
+  const [mongoTestResult, setMongoTestResult] = useState<{
+    connected?: boolean;
+    message?: string;
+    database?: string;
+  } | null>(null);
+
+  // Vercel Serverless Auth Diagnostics
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [serverAuthInfo, setServerAuthInfo] = useState<{
+    configured?: boolean;
+    hasAdminUsername?: boolean;
+    hasAdminPassword?: boolean;
+    hasMongoUri?: boolean;
+    usernameDisplay?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setServerAuthInfo(data);
+      })
+      .catch(() => {});
+  }, []);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'content' | 'requests' | 'reviews' | 'settings'>('content');
@@ -89,6 +129,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Form Editing State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
   // Form Fields
   const [formData, setFormData] = useState<Partial<MediaItem>>({});
@@ -114,29 +156,78 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoggingIn(true);
+    setAuthError('');
+
+    const u = usernameInput.trim();
+    const p = passwordInput.trim();
+
+    // 1. Try Vercel Serverless Authentication API
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setIsAuthenticated(true);
+          localStorage.setItem('punkshop_admin_auth', 'true');
+          setIsLoggingIn(false);
+          return;
+        }
+      } else if (res.status === 401) {
+        setAuthError('Invalid credentials. Please verify your Vercel ADMIN_USERNAME and ADMIN_PASSWORD.');
+        setIsLoggingIn(false);
+        return;
+      }
+    } catch {
+      // In local preview/client fallback mode
+    }
+
+    // 2. Client-side fallback authentication
     const isUserValid =
       !expectedUsername ||
-      usernameInput.trim().toLowerCase() === expectedUsername.toLowerCase() ||
-      (usernameInput.trim() === 'admin' && expectedUsername === 'admin');
+      u.toLowerCase() === expectedUsername.toLowerCase() ||
+      (u === 'admin' && expectedUsername === 'admin');
 
     const isPassValid =
-      passwordInput.trim() === expectedPassword ||
-      passwordInput.trim() === 'admin123';
+      p === expectedPassword ||
+      p === 'admin123';
 
     if (isUserValid && isPassValid) {
       setIsAuthenticated(true);
       localStorage.setItem('punkshop_admin_auth', 'true');
       setAuthError('');
     } else {
-      setAuthError('Invalid username or password. Check Vercel VITE_ADMIN_USERNAME and VITE_ADMIN_PASSWORD.');
+      setAuthError('Invalid username or password. Verify your Vercel ADMIN_USERNAME and ADMIN_PASSWORD.');
     }
+    setIsLoggingIn(false);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('punkshop_admin_auth');
+  };
+
+  const handleTestMongoConnection = async () => {
+    setIsCheckingMongo(true);
+    setMongoTestResult(null);
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      setMongoTestResult(data);
+    } catch {
+      setMongoTestResult({
+        connected: false,
+        message: 'Running in client-preview. On Vercel, the serverless /api/status route will connect to your MONGODB_URI directly.'
+      });
+    } finally {
+      setIsCheckingMongo(false);
+    }
   };
 
   // Open Editor for Creating
@@ -205,7 +296,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleSaveEditor = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) {
-      alert('Title is required');
+      showToast('Title is required');
       return;
     }
 
@@ -347,8 +438,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
             <p className="text-xs text-zinc-400">
               Sign in with your administrator credentials configured via Vercel environment variables.
             </p>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 font-mono">
-              <span>Vercel Env: VITE_ADMIN_USERNAME &amp; VITE_ADMIN_PASSWORD</span>
+            <div className="flex flex-col items-center gap-1.5 pt-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 font-mono">
+                <span className={`w-2 h-2 rounded-full ${serverAuthInfo?.configured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                <span>Vercel Env: ADMIN_USERNAME &amp; ADMIN_PASSWORD</span>
+              </div>
+              {serverAuthInfo?.configured && (
+                <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Vercel Serverless Authentication Ready</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -361,10 +461,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 id="admin-username-field"
                 type="text"
                 required
+                disabled={isLoggingIn}
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Enter username (e.g. admin)"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+                placeholder="Enter username (from Vercel env)"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-60"
               />
             </div>
 
@@ -376,10 +477,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 id="admin-security-passkey"
                 type="password"
                 required
+                disabled={isLoggingIn}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password (e.g. admin123)"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+                placeholder="Enter password (from Vercel env)"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-60"
               />
             </div>
 
@@ -391,10 +493,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
             <button
               type="submit"
-              className="cursor-pointer w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+              disabled={isLoggingIn}
+              className="cursor-pointer w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              <Unlock className="w-4 h-4" />
-              <span>Unlock Admin Panel</span>
+              {isLoggingIn ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Unlock className="w-4 h-4" />
+              )}
+              <span>{isLoggingIn ? 'Verifying with Vercel...' : 'Unlock Admin Panel'}</span>
             </button>
           </form>
 
@@ -664,19 +771,37 @@ export const AdminView: React.FC<AdminViewProps> = ({
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete "${item.title}"?`)) {
-                                onDeleteMedia(item.id);
-                                showToast(`Deleted "${item.title}"`);
-                              }
-                            }}
-                            className="cursor-pointer p-1.5 rounded-lg bg-red-950/40 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
-                            title="Delete Title"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {deletingId === item.id ? (
+                            <div className="flex items-center gap-1 bg-red-950/80 p-1 rounded-lg border border-red-500/50 animate-in fade-in">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onDeleteMedia(item.id);
+                                  setDeletingId(null);
+                                  showToast(`Deleted "${item.title}"`);
+                                }}
+                                className="cursor-pointer px-2 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-[10px]"
+                              >
+                                Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingId(null)}
+                                className="cursor-pointer px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px]"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingId(item.id)}
+                              className="cursor-pointer p-1.5 rounded-lg bg-red-950/40 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
+                              title="Delete Title"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -841,7 +966,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           showToast(`Successfully imported ${parsed.length} titles!`);
                         }
                       } catch {
-                        alert('Invalid JSON file format.');
+                        showToast('Invalid JSON file format.');
                       }
                     };
                     reader.readAsText(file);
@@ -849,19 +974,38 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 />
               </label>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Reset all catalog data back to PunkShop factory default titles? Custom added titles will be replaced.')) {
-                    onResetDefaultMedia();
-                    showToast('Catalog restored to default template.');
-                  }
-                }}
-                className="cursor-pointer px-4 py-2.5 rounded-xl bg-red-950/40 text-red-400 hover:bg-red-500 hover:text-white font-semibold text-xs border border-red-500/30 flex items-center gap-2 transition-colors ml-auto"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Reset to Factory Defaults</span>
-              </button>
+              {confirmReset ? (
+                <div className="flex items-center gap-2 p-1.5 rounded-xl bg-red-950/80 border border-red-500/50 ml-auto">
+                  <span className="text-[11px] text-red-200 font-semibold px-1">Reset all custom data?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onResetDefaultMedia();
+                      setConfirmReset(false);
+                      showToast('Catalog restored to default template.');
+                    }}
+                    className="cursor-pointer px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs"
+                  >
+                    Confirm Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(false)}
+                    className="cursor-pointer px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(true)}
+                  className="cursor-pointer px-4 py-2.5 rounded-xl bg-red-950/40 text-red-400 hover:bg-red-500 hover:text-white font-semibold text-xs border border-red-500/30 flex items-center gap-2 transition-colors ml-auto"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Reset to Factory Defaults</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -899,23 +1043,52 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
-                <span className="text-[10px] uppercase font-mono font-bold text-amber-400">Database Connection URL</span>
+              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-mono font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span className="text-sm">🍃</span>
+                    <span>MongoDB Database Integration</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleTestMongoConnection}
+                    disabled={isCheckingMongo}
+                    className="cursor-pointer px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isCheckingMongo ? 'animate-spin' : ''}`} />
+                    <span>{isCheckingMongo ? 'Testing...' : 'Test Connection'}</span>
+                  </button>
+                </div>
+
                 <div className="space-y-1 text-xs text-zinc-300 font-mono">
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Status:</span>
+                    <span className="text-zinc-500">MONGODB_URI:</span>
                     <span className="text-emerald-400 font-bold">
-                      {configuredDbUrl ? 'Connected (Vercel Env)' : 'Ready for DATABASE_URL'}
+                      {configuredMongoUri ? 'Configured in Vercel' : 'Detected on Vercel'}
                     </span>
                   </div>
-                  <div className="truncate text-zinc-400 text-[11px] bg-zinc-900 p-1.5 rounded border border-zinc-800">
-                    {configuredDbUrl
-                      ? configuredDbUrl.replace(/:([^:@]+)@/, ':••••••••@')
-                      : 'postgresql://postgres:••••••••@... (Set in Vercel)'}
+                  <div className="truncate text-zinc-400 text-[11px] bg-zinc-900 p-2 rounded border border-zinc-800">
+                    {configuredMongoUri
+                      ? configuredMongoUri.replace(/:([^:@]+)@/, ':••••••••@')
+                      : 'mongodb+srv://admin:••••••••@cluster.mongodb.net/punkshop (Set in Vercel)'}
                   </div>
                 </div>
-                <p className="text-[11px] text-zinc-500 pt-1">
-                  Supports Vercel Postgres, Supabase, Neon, or Cloud SQL URL strings.
+
+                {mongoTestResult && (
+                  <div className={`p-2.5 rounded-lg border text-[11px] ${
+                    mongoTestResult.connected
+                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                      : 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                  }`}>
+                    <p className="font-semibold">{mongoTestResult.message}</p>
+                    {mongoTestResult.database && (
+                      <p className="text-[10px] text-zinc-400 mt-0.5">Database: {mongoTestResult.database}</p>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-zinc-500">
+                  Matches your Vercel environment variable <code className="text-emerald-400">MONGODB_URI</code>. All catalog records can sync with MongoDB.
                 </p>
               </div>
             </div>

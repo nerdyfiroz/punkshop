@@ -194,9 +194,34 @@ export default function App() {
     }
   }, [selectedMedia, currentTab]);
 
-  // Handlers for Admin Operations
+  // Fetch initial media from MongoDB when connected on Vercel
+  useEffect(() => {
+    fetch('/api/media')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.items) && data.items.length > 0) {
+          setMediaList((prev) => {
+            const map = new Map<string, MediaItem>();
+            prev.forEach((item) => map.set(item.id, item));
+            data.items.forEach((item: MediaItem) => map.set(item.id, item));
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback to local catalog
+      });
+  }, []);
+
+  // Handlers for Admin Operations with MongoDB Sync
   const handleAddMedia = (newMedia: MediaItem) => {
     setMediaList((prev) => [newMedia, ...prev]);
+    // Asynchronously sync to MongoDB on Vercel
+    fetch('/api/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMedia),
+    }).catch(() => {});
   };
 
   const handleUpdateMedia = (updatedMedia: MediaItem) => {
@@ -206,6 +231,12 @@ export default function App() {
     if (selectedMedia?.id === updatedMedia.id) {
       setSelectedMedia(updatedMedia);
     }
+    // Asynchronously sync to MongoDB on Vercel
+    fetch('/api/media', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedMedia),
+    }).catch(() => {});
   };
 
   const handleDeleteMedia = (id: string) => {
@@ -213,6 +244,10 @@ export default function App() {
     if (selectedMedia?.id === id) {
       setSelectedMedia(null);
     }
+    // Asynchronously sync to MongoDB on Vercel
+    fetch(`/api/media?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }).catch(() => {});
   };
 
   const handleResetDefaultMedia = () => {
