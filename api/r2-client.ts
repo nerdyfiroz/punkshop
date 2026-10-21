@@ -10,7 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const rawAccountId = process.env.R2_ACCOUNT_ID || process.env.VITE_R2_ACCOUNT_ID || '';
 const rawAccessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.VITE_R2_ACCESS_KEY_ID || '';
 const rawSecretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.VITE_R2_SECRET_ACCESS_KEY || '';
-const rawBucket = process.env.R2_BUCKET || process.env.VITE_R2_BUCKET || 'punkshop-videos';
+const rawBucket = process.env.R2_BUCKET || process.env.VITE_R2_BUCKET || 'punkshop';
 
 // Clean helper to remove accidental quotes or whitespace
 const cleanStr = (s: string) => s.replace(/^["']|["']$/g, '').trim();
@@ -18,7 +18,7 @@ const cleanStr = (s: string) => s.replace(/^["']|["']$/g, '').trim();
 export const R2_ACCOUNT_ID = cleanStr(rawAccountId);
 export const R2_ACCESS_KEY_ID = cleanStr(rawAccessKeyId);
 export const R2_SECRET_ACCESS_KEY = cleanStr(rawSecretAccessKey);
-export const R2_BUCKET = cleanStr(rawBucket) || 'punkshop-videos';
+export const R2_BUCKET = cleanStr(rawBucket) || 'punkshop';
 
 // Safety Limits
 export const MAX_SINGLE_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB single file limit

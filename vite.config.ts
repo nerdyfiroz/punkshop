@@ -99,7 +99,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Never expose ADMIN_PASSWORD in client bundle
       'import.meta.env.ADMIN_USERNAME': JSON.stringify(env.ADMIN_USERNAME || env.VITE_ADMIN_USERNAME || 'admin'),
-      'import.meta.env.R2_BUCKET': JSON.stringify(env.R2_BUCKET || env.VITE_R2_BUCKET || 'punkshop-videos'),
+      'import.meta.env.R2_BUCKET': JSON.stringify(env.R2_BUCKET || env.VITE_R2_BUCKET || 'punkshop'),
     },
     envPrefix: ['VITE_'],
     server: {
