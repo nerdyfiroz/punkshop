@@ -1,0 +1,6 @@
+{
+  "name": "Flixcha – Stream & Download Movies and TV Shows",
+  "description": "Fast, dynamic entertainment portal to watch and download HD movies, trending TV series, and anime. Highly SEO-optimized and AdSense ready.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

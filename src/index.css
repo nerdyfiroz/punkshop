@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #09090b;
+    color: #f4f4f5;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+/* Custom Cinema Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Video Range Input slider styling */
+input[type="range"] {
+  accent-color: #f59e0b;
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(18, 18, 22, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-dropdown {
+  background: rgba(15, 15, 18, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
