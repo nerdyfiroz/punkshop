@@ -63,19 +63,33 @@ export function getExpectedCredentials() {
   const rawEnvUser = process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || '';
   const rawEnvPass = process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || '';
   return {
+    rawUser: rawEnvUser,
+    rawPass: rawEnvPass,
     username: cleanStr(rawEnvUser) || 'admin',
     password: cleanStr(rawEnvPass) || 'admin123',
+    hasCustomPassword: Boolean(rawEnvPass),
+    hasCustomUsername: Boolean(rawEnvUser),
   };
 }
 
 /**
- * Constant-time string comparison using SHA-256 to prevent timing attacks
+ * Constant-time string comparison using SHA-256 to prevent timing attacks.
+ * Also checks trimmed variations to prevent accidental trailing space issues.
  */
 export function verifyPasswordConstantTime(provided: string, expected: string): boolean {
   if (!provided || !expected) return false;
-  const hashProvided = crypto.createHash('sha256').update(provided).digest();
-  const hashExpected = crypto.createHash('sha256').update(expected).digest();
-  return crypto.timingSafeEqual(hashProvided, hashExpected);
+  
+  const hash = (s: string) => crypto.createHash('sha256').update(s).digest();
+  
+  // Exact match
+  const matchExact = crypto.timingSafeEqual(hash(provided), hash(expected));
+  if (matchExact) return true;
+
+  // Trimmed match
+  const matchTrimmed = crypto.timingSafeEqual(hash(provided.trim()), hash(expected.trim()));
+  if (matchTrimmed) return true;
+
+  return false;
 }
 
 const getSessionSecret = () => {

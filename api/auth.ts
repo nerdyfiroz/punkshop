@@ -100,10 +100,12 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const { username: expectedUser, password: expectedPass } = getExpectedCredentials();
+    const creds = getExpectedCredentials();
 
-    const isUserMatch = username.toLowerCase() === expectedUser.toLowerCase();
-    const isPassMatch = verifyPasswordConstantTime(password, expectedPass);
+    const isUserMatch = username.toLowerCase() === creds.username.toLowerCase();
+    const isPassMatch =
+      verifyPasswordConstantTime(password, creds.password) ||
+      (creds.rawPass ? verifyPasswordConstantTime(password, creds.rawPass) : false);
 
     if (isUserMatch && isPassMatch) {
       resetRateLimit(clientIp);
@@ -126,9 +128,21 @@ export default async function handler(req: any, res: any) {
       ? 'Account locked for 15 minutes due to too many failed attempts.'
       : `${failRecord.remainingAttempts} attempt(s) remaining before temporary lockout.`;
 
+    let specificReason = 'Invalid credentials.';
+    if (!creds.hasCustomPassword) {
+      specificReason =
+        'Vercel environment variables only take effect after a Redeploy. If you just added ADMIN_PASSWORD on Vercel, please go to Vercel Deployments and click "Redeploy". In the meantime, use the default password: admin123';
+    } else if (!isUserMatch) {
+      specificReason = `Username "${username}" does not match the configured admin user.`;
+    } else if (!isPassMatch) {
+      specificReason =
+        'Incorrect password. Verify that exact spelling and capitalization match your Vercel ADMIN_PASSWORD setting.';
+    }
+
     return res.status(401).json({
       success: false,
-      message: `Invalid username or password. ${remainingMsg}`,
+      message: `${specificReason} (${remainingMsg})`,
+      hasCustomPassword: creds.hasCustomPassword,
       remainingAttempts: failRecord.remainingAttempts,
     });
   }
