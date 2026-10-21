@@ -26,7 +26,16 @@ const defaultFilters: FilterState = {
 };
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<string>('home');
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname.replace(/\/+$/, '');
+      const hash = window.location.hash.replace(/^#\/?/, '');
+      if (pathname === '/admin' || hash === 'admin') return 'admin';
+      if (hash === 'sitemap') return 'sitemap';
+      if (['home', 'movies', 'tv', 'anime', 'top-imdb', 'trending', 'library'].includes(hash)) return hash;
+    }
+    return 'home';
+  });
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [downloadModalMedia, setDownloadModalMedia] = useState<MediaItem | null>(null);
   const [downloadModalOption, setDownloadModalOption] = useState<DownloadOption | undefined>(undefined);
@@ -80,12 +89,22 @@ export default function App() {
     localStorage.setItem('punkshop_reviews_data', JSON.stringify(reviewsMap));
   }, [reviewsMap]);
 
-  // Deep Link & URL Hash Synchronizer
-  const parseHash = useCallback(() => {
-    const hash = window.location.hash.replace(/^#/, '');
-    if (!hash) {
-      setCurrentTab('home');
+  // Deep Link & URL Route Synchronizer (Supports both /admin path and hash routes)
+  const parseRoute = useCallback(() => {
+    const pathname = window.location.pathname.replace(/\/+$/, '');
+    const hash = window.location.hash.replace(/^#\/?/, '');
+
+    if (pathname === '/admin' || hash === 'admin') {
+      setCurrentTab('admin');
       setSelectedMedia(null);
+      return;
+    }
+
+    if (!hash) {
+      if (pathname !== '/admin') {
+        setCurrentTab('home');
+        setSelectedMedia(null);
+      }
       return;
     }
 
@@ -119,12 +138,6 @@ export default function App() {
       return;
     }
 
-    if (hash === 'admin') {
-      setCurrentTab('admin');
-      setSelectedMedia(null);
-      return;
-    }
-
     if (['home', 'movies', 'tv', 'anime', 'top-imdb', 'trending', 'library'].includes(hash)) {
       setCurrentTab(hash);
       setSelectedMedia(null);
@@ -137,10 +150,14 @@ export default function App() {
   }, [mediaList]);
 
   useEffect(() => {
-    parseHash();
-    window.addEventListener('hashchange', parseHash);
-    return () => window.removeEventListener('hashchange', parseHash);
-  }, [parseHash]);
+    parseRoute();
+    window.addEventListener('hashchange', parseRoute);
+    window.addEventListener('popstate', parseRoute);
+    return () => {
+      window.removeEventListener('hashchange', parseRoute);
+      window.removeEventListener('popstate', parseRoute);
+    };
+  }, [parseRoute]);
 
   // Dynamic SEO Synchronization
   useEffect(() => {
@@ -299,6 +316,9 @@ export default function App() {
   };
 
   const handleSelectTab = (tab: string) => {
+    if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+      window.history.pushState(null, '', '/');
+    }
     setSelectedMedia(null);
     setCurrentTab(tab);
     window.location.hash = tab === 'home' ? '' : tab;
@@ -316,6 +336,29 @@ export default function App() {
     } else if (tab === 'home') {
       setFilters(defaultFilters);
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleExitAdmin = () => {
+    if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+      window.history.pushState(null, '', '/');
+    }
+    if (window.location.hash.replace(/^#\/?/, '') === 'admin') {
+      window.location.hash = '';
+    }
+    setCurrentTab('home');
+    setSelectedMedia(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAdminViewMedia = (media: MediaItem) => {
+    if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+      window.history.pushState(null, '', `/#watch?id=${media.slug}`);
+    } else {
+      window.location.hash = `watch?id=${media.slug}`;
+    }
+    setSelectedMedia(media);
+    setCurrentTab('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -372,6 +415,28 @@ export default function App() {
     });
   };
 
+  // Standalone Admin Portal (Available at /admin or #admin)
+  // Completely isolated: Does not render public consumer Navbar, sticky AdSense banner, or consumer Footer.
+  if (currentTab === 'admin') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-amber-500 selection:text-black">
+        <AdminView
+          mediaList={mediaList}
+          onAddMedia={handleAddMedia}
+          onUpdateMedia={handleUpdateMedia}
+          onDeleteMedia={handleDeleteMedia}
+          onResetDefaultMedia={handleResetDefaultMedia}
+          onExportMedia={handleExportMedia}
+          onImportMedia={handleImportMedia}
+          reviewsMap={reviewsMap}
+          onDeleteReview={handleDeleteReview}
+          onViewMedia={handleAdminViewMedia}
+          onExitAdmin={handleExitAdmin}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-black">
       {/* Top Main Navigation Header */}
@@ -419,20 +484,6 @@ export default function App() {
             onExploreCategory={handleExploreCategory}
             watchlist={watchlist}
             onToggleWatchlist={handleToggleWatchlist}
-          />
-        ) : currentTab === 'admin' ? (
-          <AdminView
-            mediaList={mediaList}
-            onAddMedia={handleAddMedia}
-            onUpdateMedia={handleUpdateMedia}
-            onDeleteMedia={handleDeleteMedia}
-            onResetDefaultMedia={handleResetDefaultMedia}
-            onExportMedia={handleExportMedia}
-            onImportMedia={handleImportMedia}
-            reviewsMap={reviewsMap}
-            onDeleteReview={handleDeleteReview}
-            onViewMedia={handleSelectMedia}
-            onExitAdmin={() => handleSelectTab('home')}
           />
         ) : currentTab === 'library' ? (
           <LibraryView

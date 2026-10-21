@@ -11,10 +11,7 @@ import {
   TrendingUp,
   Star,
   PlusCircle,
-  FileCode,
-  ShieldAlert,
-  Lock,
-  Sliders
+  FileCode
 } from 'lucide-react';
 import { MediaItem } from '../types';
 import { MOCK_MEDIA } from '../data/mockMedia';
@@ -232,22 +229,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
-          {/* Admin Panel Button */}
-          <button
-            type="button"
-            onClick={() => onSelectTab('admin')}
-            aria-label="Admin Panel"
-            className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              currentTab === 'admin'
-                ? 'bg-amber-500 text-black shadow-md font-bold'
-                : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 hover:border-amber-500/50 hover:text-amber-400'
-            }`}
-            title="Administrator Portal"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Admin</span>
-          </button>
-
           {/* Mobile Menu Toggle */}
           <button
             type="button"
@@ -319,17 +300,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <FileCode className="w-3.5 h-3.5" />
               <span>XML Sitemap</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSelectTab('admin');
-                setMobileMenuOpen(false);
-              }}
-              className="cursor-pointer text-amber-400 font-bold flex items-center gap-1"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Admin Panel</span>
             </button>
           </div>
         </div>
