@@ -55,18 +55,42 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     }, 1000);
   };
 
-  const handleTriggerDirectDownload = () => {
+  const handleTriggerDirectDownload = async () => {
     setIsDownloading(true);
     setSimulatedProgress(0);
 
-    // Trigger actual download of video
-    const link = document.createElement('a');
-    link.href = selectedOption.directUrl;
-    link.download = `${media.slug}_${selectedOption.quality.toLowerCase().replace(/\s+/g, '_')}.${selectedOption.format.toLowerCase()}`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // If Cloudflare R2 signed download endpoint
+    if (selectedOption.directUrl.startsWith('/api/download')) {
+      try {
+        const res = await fetch(selectedOption.directUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.downloadUrl) {
+            const link = document.createElement('a');
+            link.href = data.downloadUrl;
+            link.setAttribute('download', data.filename || `${media.slug}.mp4`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } else {
+            window.location.href = `${selectedOption.directUrl}&format=redirect`;
+          }
+        } else {
+          window.location.href = `${selectedOption.directUrl}&format=redirect`;
+        }
+      } catch {
+        window.location.href = `${selectedOption.directUrl}&format=redirect`;
+      }
+    } else {
+      // Standard direct download
+      const link = document.createElement('a');
+      link.href = selectedOption.directUrl;
+      link.download = `${media.slug}_${selectedOption.quality.toLowerCase().replace(/\s+/g, '_')}.${selectedOption.format.toLowerCase()}`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
 
     // Run simulated progress counter for user feedback
     const progInterval = setInterval(() => {

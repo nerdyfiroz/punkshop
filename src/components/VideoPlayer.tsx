@@ -59,6 +59,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [activeSubtitle, setActiveSubtitle] = useState<string>('English');
   const [showSettingsMenu, setShowSettingsMenu] = useState<boolean>(false);
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>(videoUrl);
+  const [streamError, setStreamError] = useState<string | null>(null);
+
+  // Resolve signed stream URL (with auto-refresh on expiration)
+  const fetchFreshStreamUrl = useCallback(async () => {
+    if (videoUrl.startsWith('/api/stream')) {
+      try {
+        const res = await fetch(videoUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.streamUrl) {
+            setResolvedVideoUrl(data.streamUrl);
+            setStreamError(null);
+            return;
+          }
+        }
+        // Fallback to direct redirect
+        setResolvedVideoUrl(`${videoUrl}${videoUrl.includes('?') ? '&' : '?'}redirect=true`);
+      } catch {
+        setResolvedVideoUrl(`${videoUrl}${videoUrl.includes('?') ? '&' : '?'}redirect=true`);
+      }
+    } else {
+      setResolvedVideoUrl(videoUrl);
+    }
+  }, [videoUrl]);
+
+  useEffect(() => {
+    fetchFreshStreamUrl();
+  }, [fetchFreshStreamUrl]);
 
   // Resume last playback time from localStorage
   useEffect(() => {
@@ -223,7 +252,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       >
         <video
           ref={videoRef}
-          src={videoUrl}
+          src={resolvedVideoUrl}
           poster={posterUrl}
           className="w-full h-full object-contain cursor-pointer"
           onClick={togglePlay}
@@ -235,6 +264,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsPlaying(true);
           }}
           onPause={() => setIsPlaying(false)}
+          onError={() => {
+            // If signed URL expired or failed, automatically fetch a fresh signed stream URL
+            if (videoUrl.startsWith('/api/stream')) {
+              fetchFreshStreamUrl();
+            }
+          }}
           playsInline
         />
 

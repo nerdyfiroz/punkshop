@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MediaItem, DownloadOption, FilterState, LegalPageType, UserReview } from './types';
+import { MediaItem, DownloadOption, FilterState, LegalPageType, UserReview, HostedVideo, hostedVideoToMediaItem } from './types';
 import { MOCK_MEDIA, INITIAL_REVIEWS } from './data/mockMedia';
 import { updatePageSEO } from './utils/seo';
 import { Navbar } from './components/Navbar';
@@ -89,7 +89,31 @@ export default function App() {
     localStorage.setItem('punkshop_reviews_data', JSON.stringify(reviewsMap));
   }, [reviewsMap]);
 
-  // Deep Link & URL Route Synchronizer (Supports both /admin path and hash routes)
+  // Fetch live R2 hosted videos from /api/videos and merge into catalog
+  const fetchHostedVideos = useCallback(async () => {
+    try {
+      const res = await fetch('/api/videos?limit=100');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
+          const r2MediaItems: MediaItem[] = data.videos.map((v: HostedVideo) => hostedVideoToMediaItem(v));
+          setMediaList((prev) => {
+            const r2Ids = new Set(r2MediaItems.map((m) => m.id));
+            const baseItems = prev.filter((m) => !r2Ids.has(m.id) && !m.isR2Hosted);
+            return [...r2MediaItems, ...baseItems];
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHostedVideos();
+  }, [fetchHostedVideos]);
+
+  // Deep Link & URL Route Synchronizer (Supports /admin, /watch/:id, and hash routes)
   const parseRoute = useCallback(() => {
     const pathname = window.location.pathname.replace(/\/+$/, '');
     const hash = window.location.hash.replace(/^#\/?/, '');
@@ -98,6 +122,16 @@ export default function App() {
       setCurrentTab('admin');
       setSelectedMedia(null);
       return;
+    }
+
+    // Direct /watch/:id URL support
+    if (pathname.startsWith('/watch/')) {
+      const id = pathname.replace('/watch/', '').replace(/\/$/, '');
+      const found = mediaList.find((m) => m.id === id || m.slug === id);
+      if (found) {
+        setSelectedMedia(found);
+        return;
+      }
     }
 
     if (!hash) {

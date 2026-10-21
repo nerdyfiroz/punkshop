@@ -38,9 +38,11 @@ import {
   Episode,
   Season,
   CastMember,
-  UserReview
+  UserReview,
+  hostedVideoToMediaItem,
 } from '../types';
 import { GENRES_LIST, SAMPLE_VIDEOS } from '../data/mockMedia';
+import { AdminVideoHosting } from '../components/AdminVideoHosting';
 
 interface AdminViewProps {
   mediaList: MediaItem[];
@@ -123,9 +125,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, []);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'content' | 'requests' | 'reviews' | 'settings'>('content');
+  const [activeTab, setActiveTab] = useState<'videos' | 'content' | 'requests' | 'reviews' | 'settings'>('videos');
+  const [adminToken, setAdminToken] = useState<string>(() => {
+    return typeof window !== 'undefined' ? sessionStorage.getItem('punkshop_admin_token') || '' : '';
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('all');
+
+  // Check existing session on load
+  useEffect(() => {
+    fetch('/api/auth?action=me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.authenticated) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Form Editing State
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
@@ -165,52 +182,53 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const u = usernameInput.trim();
     const p = passwordInput.trim();
 
-    // 1. Try Vercel Serverless Authentication API
+    // 1. Try Vercel Serverless Authentication API with constant-time password & rate limit
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, password: p }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setIsAuthenticated(true);
-          localStorage.setItem('punkshop_admin_auth', 'true');
-          setIsLoggingIn(false);
-          return;
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setIsAuthenticated(true);
+        if (data.token) {
+          setAdminToken(data.token);
+          sessionStorage.setItem('punkshop_admin_token', data.token);
         }
-      } else if (res.status === 401) {
-        setAuthError('Invalid credentials. Please verify your Vercel ADMIN_USERNAME and ADMIN_PASSWORD.');
+        localStorage.setItem('punkshop_admin_auth', 'true');
+        setIsLoggingIn(false);
+        return;
+      } else if (res.status === 429) {
+        setAuthError(data.message || 'Rate limit exceeded. Too many login attempts.');
+        setIsLoggingIn(false);
+        return;
+      } else {
+        setAuthError(data.message || 'Invalid username or password. Verify your ADMIN_USERNAME and ADMIN_PASSWORD.');
         setIsLoggingIn(false);
         return;
       }
     } catch {
-      // In local preview/client fallback mode
-    }
-
-    // 2. Client-side fallback authentication
-    const isUserValid =
-      !expectedUsername ||
-      u.toLowerCase() === expectedUsername.toLowerCase() ||
-      (u === 'admin' && expectedUsername === 'admin');
-
-    const isPassValid =
-      p === expectedPassword ||
-      p === 'admin123';
-
-    if (isUserValid && isPassValid) {
-      setIsAuthenticated(true);
-      localStorage.setItem('punkshop_admin_auth', 'true');
-      setAuthError('');
-    } else {
-      setAuthError('Invalid username or password. Verify your Vercel ADMIN_USERNAME and ADMIN_PASSWORD.');
+      // In local preview fallback
+      if (u === 'admin' && p === 'admin123') {
+        setIsAuthenticated(true);
+        localStorage.setItem('punkshop_admin_auth', 'true');
+      } else {
+        setAuthError('Login failed. Please check your credentials.');
+      }
     }
     setIsLoggingIn(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth?action=logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
     setIsAuthenticated(false);
+    setAdminToken('');
+    sessionStorage.removeItem('punkshop_admin_token');
     localStorage.removeItem('punkshop_admin_auth');
   };
 
@@ -684,6 +702,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
       <div className="flex items-center gap-1 border-b border-zinc-800 pb-2 overflow-x-auto">
         <button
           type="button"
+          onClick={() => setActiveTab('videos')}
+          className={`cursor-pointer px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
+            activeTab === 'videos' ? 'bg-amber-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Cloudflare R2 Video Hosting</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('content')}
           className={`cursor-pointer px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
             activeTab === 'content' ? 'bg-amber-500 text-black' : 'text-zinc-400 hover:text-white'
@@ -726,6 +755,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
           <span>Backup & Database Reset</span>
         </button>
       </div>
+
+      {/* TAB 0: CLOUDFLARE R2 VIDEO HOSTING & STORAGE METER */}
+      {activeTab === 'videos' && (
+        <AdminVideoHosting
+          adminToken={adminToken}
+          onPreviewVideo={(video) => onViewMedia(hostedVideoToMediaItem(video))}
+        />
+      )}
 
       {/* TAB 1: CONTENT MANAGER */}
       {activeTab === 'content' && (
