@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getDb } from './db.ts';
 
 export default async function handler(req: any, res: any) {
   // Set CORS headers

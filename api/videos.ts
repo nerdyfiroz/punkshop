@@ -5,8 +5,8 @@ import {
   isR2Configured,
   ALLOWED_MIME_TYPES,
   STORAGE_CEILING_BYTES,
-} from './r2-client';
-import { isAdminAuthorized } from './auth-util';
+} from './r2-client.ts';
+import { isAdminAuthorized } from './auth-util.ts';
 import {
   getVideos,
   getVideoById,
@@ -14,8 +14,8 @@ import {
   updateVideoMetadata,
   deleteVideoRecord,
   getTotalStorageBytes,
-  HostedVideoRecord,
-} from './video-db';
+  type HostedVideoRecord,
+} from './video-db.ts';
 
 export default async function handler(req: any, res: any) {
   // CORS setup

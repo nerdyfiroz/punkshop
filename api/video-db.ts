@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getDb } from './db';
+import { getDb } from './db.ts';
 
 export interface HostedVideoRecord {
   id: string;
@@ -20,7 +20,11 @@ export interface HostedVideoRecord {
 }
 
 // Local filesystem fallback storage path when MongoDB is not connected
-const FALLBACK_DIR = path.resolve(process.cwd(), '.data');
+// Uses /tmp on serverless environments (e.g. Vercel) where root filesystem is read-only
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const FALLBACK_DIR = isServerless
+  ? path.join('/tmp', 'punkshop-data')
+  : path.resolve(process.cwd(), '.data');
 const FALLBACK_FILE = path.join(FALLBACK_DIR, 'videos.json');
 
 // Memory cache

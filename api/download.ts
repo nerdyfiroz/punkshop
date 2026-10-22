@@ -1,5 +1,5 @@
-import { createSignedDownloadUrl, isR2Configured } from './r2-client';
-import { getVideoById, incrementVideoDownloads } from './video-db';
+import { createSignedDownloadUrl, isR2Configured } from './r2-client.ts';
+import { getVideoById, incrementVideoDownloads } from './video-db.ts';
 
 export default async function handler(req: any, res: any) {
   // CORS setup

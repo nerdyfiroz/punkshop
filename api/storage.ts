@@ -3,8 +3,8 @@ import {
   R2_BUCKET,
   STORAGE_CEILING_BYTES,
   FREE_TIER_LIMIT_BYTES,
-} from './r2-client';
-import { getTotalStorageBytes } from './video-db';
+} from './r2-client.ts';
+import { getTotalStorageBytes } from './video-db.ts';
 
 export default async function handler(req: any, res: any) {
   // CORS setup

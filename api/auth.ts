@@ -8,7 +8,7 @@ import {
   isAdminAuthorized,
   buildSessionCookie,
   buildClearSessionCookie,
-} from './auth-util';
+} from './auth-util.ts';
 
 export default async function handler(req: any, res: any) {
   // CORS setup for Vercel functions
