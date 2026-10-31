@@ -107,7 +107,7 @@ async function connectWallet() {
 async function updateMintLabel() {
   if (!mineButton || !mintQuantity) return;
   if (!account || !configured()) {
-    mineButton.innerHTML = `${account ? 'Configure contract to mint' : 'Connect wallet to mint'} <span>↗</span>`;
+    mineButton.innerHTML = `${account ? 'Configure contract to mint' : 'Connect wallet to mint'} <span></span>`;
     return;
   }
   try {
@@ -119,9 +119,9 @@ async function updateMintLabel() {
     const freeAvailable = !(await readContract.freeMintClaimed(account));
     const quantity = Math.min(10, Math.max(1, Number(mintQuantity.value)));
     const paidQuantity = freeAvailable ? quantity - 1 : quantity;
-    mineButton.innerHTML = `${freeAvailable ? 'Mint free + paid' : 'Mint'} · ${ethers.formatEther((await readContract.MINT_PRICE()) * BigInt(paidQuantity))} BNB <span>↗</span>`;
+    mineButton.innerHTML = `${freeAvailable ? 'Mint free + paid' : 'Mint'} · ${ethers.formatEther((await readContract.MINT_PRICE()) * BigInt(paidQuantity))} BNB <span></span>`;
   } catch {
-    mineButton.innerHTML = 'Mint with Agentic Wallet <span>↗</span>';
+    mineButton.innerHTML = 'Mint with Agentic Wallet <span></span>';
   }
 }
 
@@ -253,7 +253,7 @@ function renderListings(listings) {
     const price = ethers.formatEther(listing.price);
     const ownerAction = account && listing.seller.toLowerCase() === account.toLowerCase()
       ? `<button class="secondary-button cancel-listing" data-token="${listing.tokenId}">Delist</button>`
-      : `<button class="mine-button buy-listing" data-token="${listing.tokenId}" data-price="${listing.price}">Buy <span>↗</span></button>`;
+      : `<button class="mine-button buy-listing" data-token="${listing.tokenId}" data-price="${listing.price}">Buy <span></span></button>`;
     return `<article class="market-row"><div><strong>Punk #${listing.tokenId}</strong><span>${shortenAddress(listing.seller)}</span></div><b>${price} BNB</b>${ownerAction}</article>`;
   }).join('');
   marketList.querySelectorAll('.buy-listing').forEach((button) => button.addEventListener('click', () => buyPunk(button.dataset.token, button.dataset.price)));
@@ -267,7 +267,7 @@ function renderActivity(logs) {
     const isSale = log.fragment.name === 'Sold';
     const tokenId = log.args.tokenId.toString();
     const address = isSale ? log.args.buyer : log.args.minter;
-    return `<div class="feed-item"><span class="feed-badge">AP</span><div><strong>Punk #${tokenId} ${isSale ? 'sold' : 'minted'}</strong><span>${isSale ? `${ethers.formatEther(log.args.price)} BNB` : 'Confirmed on BNB Smart Chain'}</span></div><code>${shortenAddress(address)}</code><span class="feed-arrow">↗</span></div>`;
+    return `<div class="feed-item"><span class="feed-badge">AP</span><div><strong>Punk #${tokenId} ${isSale ? 'sold' : 'minted'}</strong><span>${isSale ? `${ethers.formatEther(log.args.price)} BNB` : 'Confirmed on BNB Smart Chain'}</span></div><code>${shortenAddress(address)}</code><span class="feed-arrow"></span></div>`;
   }).join('');
 }
 
