@@ -1,0 +1,5 @@
+{
+  "buildCommand": "echo Static Agent Punks site - no build required",
+  "outputDirectory": ".",
+  "cleanUrls": true
+}
