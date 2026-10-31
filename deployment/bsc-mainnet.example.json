@@ -1,0 +1,11 @@
+{
+  "chainId": 56,
+  "network": "bsc-mainnet",
+  "rpcUrl": "https://bsc-dataseed.binance.org",
+  "deployer": "REPLACE_WITH_BSC_DEPLOYER_ADDRESS",
+  "initialOwner": "REPLACE_WITH_BSC_OWNER_ADDRESS",
+  "agentIdRegistry": "REPLACE_WITH_OFFICIAL_BINANCE_AGENT_ID_REGISTRY_ADDRESS",
+  "mintFeeRecipient": "REPLACE_WITH_BSC_MINT_REVENUE_ADDRESS",
+  "protocolFeeRecipient": "REPLACE_WITH_BSC_PROTOCOL_FEE_ADDRESS",
+  "baseTokenURI": "ipfs://bafybeid74u3pubfwezis6txcjq3hnynmvwun4uozgzsfpysvncnolm6lqu/"
+}
