@@ -423,13 +423,21 @@ async function queryEvents(readContract, filter, fromBlock, toBlock) {
 }
 
 async function queryVercelMarketEvents(fromBlock, toBlock, readContract) {
-  const response = await fetch(`/api/market-events?fromBlock=${fromBlock}&toBlock=${toBlock}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error('Market event API unavailable');
-  const body = await response.json();
-  return body.logs.map((log) => {
+  const ranges = [];
+  for (let start = fromBlock; start <= toBlock; start += 5000) {
+    ranges.push([start, Math.min(start + 4999, toBlock)]);
+  }
+  const responses = await Promise.all(ranges.map(([start, end]) =>
+    fetch(`/api/market-events?fromBlock=${start}&toBlock=${end}`, { cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Market event API returned ${response.status}`);
+        return response.json();
+      })
+  ));
+  return responses.flatMap((body) => body.logs.map((log) => {
     const parsed = readContract.interface.parseLog({ topics: log.topics, data: log.data });
     return parsed ? Object.assign(parsed, { eventKey: `${log.transactionHash}:${log.logIndex}:${parsed.name}` }) : null;
-  }).filter(Boolean);
+  }).filter(Boolean));
 }
 
 function recordMarketStats(logs, reset = false) {
@@ -490,7 +498,7 @@ async function refreshLiveData() {
       ? Math.max(fromBlock, latestBlock - 2000)
       : fromBlock;
     const eventFromBlock = marketOnly && marketLastBlock ? marketLastBlock + 1 : activityFromBlock;
-    const marketEvents = marketList && marketLastBlock
+    const marketEvents = marketList
       ? queryVercelMarketEvents(eventFromBlock, latestBlock, readContract).catch(() => Promise.all([
         queryEvents(readContract, readContract.filters.Listed(), eventFromBlock, latestBlock),
         queryEvents(readContract, readContract.filters.ListingEdited(), eventFromBlock, latestBlock),
