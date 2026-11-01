@@ -17,6 +17,7 @@ const ABI = [
   'function mint(uint256 quantity) payable',
   'function approve(address to, uint256 tokenId)',
   'function list(uint256 tokenId, uint256 price, uint256 duration)',
+  'function editListing(uint256 tokenId, uint256 newPrice, uint256 duration)',
   'function buy(uint256 tokenId) payable',
   'function cancelListing(uint256 tokenId)',
   'function hasAgentId(address account) view returns (bool)',
@@ -24,6 +25,7 @@ const ABI = [
   'function MINT_PRICE() view returns (uint256)',
   'function totalMinted() view returns (uint256)',
   'function freeMinted() view returns (uint256)',
+  'function FREE_MINT_SUPPLY() view returns (uint256)',
   'function MAX_SUPPLY() view returns (uint256)',
   'function tokenURI(uint256 tokenId) view returns (string)',
   'function listings(uint256 tokenId) view returns (address seller, uint256 price, uint256 expiresAt)',
@@ -46,11 +48,22 @@ const mintProgressLabel = document.querySelector('#mintProgressLabel');
 const promptButton = document.querySelector('#promptButton');
 const mintQuantity = document.querySelector('#mintQuantity');
 const marketList = document.querySelector('#marketList');
+const marketSearch = document.querySelector('#marketSearch');
+const marketSort = document.querySelector('#marketSort');
+const marketStatus = document.querySelector('#marketStatus');
+const marketMinPrice = document.querySelector('#marketMinPrice');
+const marketMaxPrice = document.querySelector('#marketMaxPrice');
+const marketFloor = document.querySelector('#marketFloor');
+const marketListings = document.querySelector('#marketListings');
+const sellSection = document.querySelector('#sellSection');
+let currentListings = [];
 const activityFeed = document.querySelector('#activityFeed');
 const listButton = document.querySelector('#listButton');
 const durationOptions = document.querySelectorAll('.duration-option');
 const customDuration = document.querySelector('#customDuration');
 const directMintButton = document.querySelector('#directMintButton');
+const sellPromptButton = document.querySelector('#sellPromptButton');
+const editPromptButton = document.querySelector('#editPromptButton');
 let listingDuration = 1;
 let walletProvider;
 let browserProvider;
@@ -61,12 +74,34 @@ let refreshTimer;
 
 const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
 
+const marketPrompts = {
+  buy: 'Open the Agent Punks website at https://www.punksnft.store and read the market guide. Help me buy a listed Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. A normal wallet can buy; Agent ID eligibility is not required for marketplace purchases. First check the listing, seller, exact price, wallet balance, network, gas estimate, and Developer Mode. Show me the exact transaction preview for approval before sending, including contract address, function, token ID, value, gas estimate, and recipient. Use English, never guess a token ID or price, and never treat a pending transaction as confirmed.',
+  sell: 'Open the Agent Punks website at https://www.punksnft.store and read the market guide. Help me list my Agent Punks NFT for sale with my Binance Agentic Wallet on BNB Smart Chain. First check wallet ownership, approvals, listing status, price, duration, network, wallet balance, and Developer Mode. Show me the exact transaction preview for approval before sending, including contract address, function, token ID, price, duration, gas estimate, and recipient. Use English, never guess a token ID or price, and never treat a pending transaction as confirmed.',
+  edit: 'Open the Agent Punks website at https://www.punksnft.store and read the market guide. Help me change the price or duration of my existing Agent Punks listing with my Binance Agentic Wallet on BNB Smart Chain. First check wallet ownership, current listing, new price, duration, network, wallet balance, and Developer Mode. Show me the exact transaction preview for approval before sending, including contract address, function, token ID, new price, duration, gas estimate, and recipient. Use English, never guess a token ID or price, and never treat a pending transaction as confirmed.',
+};
+
 function getAgentPrompt() {
   const requestedQuantity = Number(mintQuantity?.value);
   const quantity = Number.isInteger(requestedQuantity) && requestedQuantity >= 1 && requestedQuantity <= 10
     ? requestedQuantity
     : 1;
   return `${agentPrompt} I want to mint exactly ${quantity} Agent Punks NFT${quantity === 1 ? '' : 's'}.`;
+}
+
+function getMarketPrompt(type) {
+  const tokenId = document.querySelector('#sellTokenId')?.value || '[token ID]';
+  const price = document.querySelector('#sellPrice')?.value || '[price in BNB]';
+  const duration = document.querySelector('#customDuration')?.value || '[duration in days]';
+  return `${marketPrompts[type]} I want to ${type === 'sell' ? 'list' : 'update'} token ID ${tokenId} at ${price} BNB for ${duration} days.`;
+}
+
+async function copyPrompt(prompt, message) {
+  try {
+    await navigator.clipboard.writeText(prompt);
+    showToast(message);
+  } catch {
+    showToast('Select and copy the prompt from the browser');
+  }
 }
 
 function initLobbyCarousel() {
@@ -181,7 +216,7 @@ async function updateMintLabel() {
     const freeAvailable = !(await readContract.freeMintClaimed(account));
     const quantity = Math.min(10, Math.max(1, Number(mintQuantity.value)));
     const paidQuantity = freeAvailable ? quantity - 1 : quantity;
-    mineButton.innerHTML = `${freeAvailable ? 'Mint free + paid' : 'Mint'} · ${ethers.formatEther((await readContract.MINT_PRICE()) * BigInt(paidQuantity))} BNB <span></span>`;
+    mineButton.innerHTML = `${freeAvailable ? 'Mint free + paid' : 'Mint publicly'} · ${ethers.formatEther((await readContract.MINT_PRICE()) * BigInt(paidQuantity))} BNB <span></span>`;
   } catch {
     mineButton.innerHTML = 'Mint with Agentic Wallet <span></span>';
   }
@@ -202,7 +237,7 @@ async function mint() {
       return;
     }
     const claimed = await readContract.freeMintClaimed(account);
-    const paidQuantity = eligible && !claimed ? quantity - 1 : quantity;
+    const paidQuantity = !claimed ? quantity - 1 : quantity;
     const value = (await readContract.MINT_PRICE()) * BigInt(paidQuantity);
     const tx = await getWriteContract().mint(quantity, { value });
     showToast(`Mint submitted: ${tx.hash.slice(0, 10)}...`);
@@ -339,19 +374,50 @@ async function refreshLiveData() {
 
 function renderListings(listings) {
   if (!marketList) return;
+  currentListings = listings;
+  const search = marketSearch?.value.trim().toLowerCase() || '';
+  const status = marketStatus?.value || 'all';
+  const minPrice = Number(marketMinPrice?.value) || 0;
+  const maxPrice = Number(marketMaxPrice?.value) || Number.POSITIVE_INFINITY;
+  const sort = marketSort?.value || 'price-asc';
   if (!listings.length) {
+    if (marketListings) marketListings.textContent = '0';
+    if (marketFloor) marketFloor.textContent = '—';
     marketList.innerHTML = '<div class="market-empty"><span class="empty-mark">—</span><strong>No active listings</strong><span>Live listings will appear here after a punk is listed.</span></div>';
     return;
   }
-  marketList.innerHTML = listings.map((listing) => {
+  const filtered = listings
+    .filter((listing) => {
+      const tokenId = listing.tokenId.toString();
+      const price = Number(ethers.formatEther(listing.price));
+      const mine = account && listing.seller.toLowerCase() === account.toLowerCase();
+      return (!search || tokenId.includes(search.replace(/^#/, '')))
+        && (status !== 'mine' || mine)
+        && price >= minPrice
+        && price <= maxPrice;
+    })
+    .sort((a, b) => {
+      if (sort === 'token-desc') return Number(b.tokenId) - Number(a.tokenId);
+      const difference = Number(a.price - b.price);
+      return sort === 'price-desc' ? -difference : difference;
+    });
+  if (marketListings) marketListings.textContent = listings.length.toLocaleString();
+  if (marketFloor) marketFloor.textContent = listings.length ? ethers.formatEther([...listings].sort((a, b) => Number(a.price - b.price))[0].price) : '—';
+  if (!filtered.length) {
+    marketList.innerHTML = '<div class="market-empty"><span class="empty-mark">—</span><strong>No matching listings</strong><span>Try clearing a filter or check back after the next chain refresh.</span></div>';
+    return;
+  }
+  marketList.innerHTML = filtered.map((listing) => {
     const price = ethers.formatEther(listing.price);
     const ownerAction = account && listing.seller.toLowerCase() === account.toLowerCase()
       ? `<button class="secondary-button cancel-listing" data-token="${listing.tokenId}">Delist</button>`
       : `<button class="mine-button buy-listing" data-token="${listing.tokenId}" data-price="${listing.price}">Buy <span></span></button>`;
-    return `<article class="market-row"><div><strong>Punk #${listing.tokenId}</strong><span>${shortenAddress(listing.seller)}</span></div><b>${price} BNB</b>${ownerAction}</article>`;
+    const promptAction = `<button class="prompt-button buy-prompt" data-token="${listing.tokenId}" data-price="${price}" type="button">Copy buy prompt</button>`;
+    return `<article class="market-row"><div><strong>Punk #${listing.tokenId}</strong><span>${shortenAddress(listing.seller)}</span></div><b>${price} BNB</b><div>${ownerAction}${promptAction}</div></article>`;
   }).join('');
   marketList.querySelectorAll('.buy-listing').forEach((button) => button.addEventListener('click', () => buyPunk(button.dataset.token, button.dataset.price)));
   marketList.querySelectorAll('.cancel-listing').forEach((button) => button.addEventListener('click', () => cancelListing(button.dataset.token)));
+  marketList.querySelectorAll('.buy-prompt').forEach((button) => button.addEventListener('click', () => copyPrompt(`${marketPrompts.buy} I want to buy token ID ${button.dataset.token} for ${button.dataset.price} BNB.`, 'Buy prompt copied')));
 }
 
 function renderActivity(logs) {
@@ -371,8 +437,23 @@ function renderActivity(logs) {
 walletButton?.addEventListener('click', connectWallet);
 mineButton?.addEventListener('click', mint);
 directMintButton?.addEventListener('click', directMint);
+sellPromptButton?.addEventListener('click', () => copyPrompt(getMarketPrompt('sell'), 'Sell prompt copied'));
+editPromptButton?.addEventListener('click', () => copyPrompt(getMarketPrompt('edit'), 'Price-change prompt copied'));
 mintQuantity?.addEventListener('input', updateMintLabel);
 listButton?.addEventListener('click', listPunk);
+marketSearch?.addEventListener('input', () => renderListings(currentListings));
+marketSort?.addEventListener('change', () => renderListings(currentListings));
+marketStatus?.addEventListener('change', () => renderListings(currentListings));
+marketMinPrice?.addEventListener('input', () => renderListings(currentListings));
+marketMaxPrice?.addEventListener('input', () => renderListings(currentListings));
+document.querySelector('#clearMarketFilters')?.addEventListener('click', () => {
+  if (marketSearch) marketSearch.value = '';
+  if (marketStatus) marketStatus.value = 'all';
+  if (marketMinPrice) marketMinPrice.value = '';
+  if (marketMaxPrice) marketMaxPrice.value = '';
+  renderListings(currentListings);
+});
+document.querySelector('[data-scroll-sell]')?.addEventListener('click', () => sellSection?.scrollIntoView({ behavior: 'smooth' }));
 promptButton?.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(getAgentPrompt());
