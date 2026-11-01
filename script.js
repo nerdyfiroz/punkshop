@@ -388,13 +388,13 @@ async function cancelListing(tokenId) {
 }
 
 async function queryEvents(readContract, filter, fromBlock, toBlock) {
-  const logs = [];
   const chunkSize = activityFeed && !marketList ? 100 : 10000;
+  const ranges = [];
   for (let start = fromBlock; start <= toBlock; start += chunkSize + 1) {
-    const end = Math.min(start + chunkSize, toBlock);
-    logs.push(...await readContract.queryFilter(filter, start, end));
+    ranges.push([start, Math.min(start + chunkSize, toBlock)]);
   }
-  return logs;
+  const results = await Promise.all(ranges.map(([start, end]) => readContract.queryFilter(filter, start, end)));
+  return results.flat();
 }
 
 async function queryVercelMarketEvents(fromBlock, toBlock, readContract) {
@@ -441,23 +441,25 @@ async function refreshLiveData() {
     return;
   }
   try {
-    const total = await readContract.totalMinted();
-    if (mintedCount) mintedCount.textContent = Number(total).toLocaleString();
-    if (freeMintedCount) {
-      const freeMinted = await readContract.freeMinted();
-      freeMintedCount.textContent = Number(freeMinted).toLocaleString();
-    }
-    if (remainingCount) {
-      const maxSupply = await readContract.MAX_SUPPLY();
-      remainingCount.textContent = Number(maxSupply - total).toLocaleString();
-      const progress = Math.min(100, Math.max(0, Number(total) / Number(maxSupply) * 100));
-      if (mintProgressFill) mintProgressFill.style.width = `${progress}%`;
-      if (mintProgressLabel) mintProgressLabel.textContent = `${progress.toFixed(1)}% minted`;
+    const latestBlockPromise = browserProvider.getBlockNumber();
+    const supplyReads = mintedCount || freeMintedCount || remainingCount
+      ? Promise.all([readContract.totalMinted(), readContract.freeMinted(), readContract.MAX_SUPPLY()])
+      : Promise.resolve(null);
+    const [latestBlock, supply] = await Promise.all([latestBlockPromise, supplyReads]);
+    if (supply) {
+      const [total, freeMinted, maxSupply] = supply;
+      if (mintedCount) mintedCount.textContent = Number(total).toLocaleString();
+      if (freeMintedCount) freeMintedCount.textContent = Number(freeMinted).toLocaleString();
+      if (remainingCount) {
+        remainingCount.textContent = Number(maxSupply - total).toLocaleString();
+        const progress = Math.min(100, Math.max(0, Number(total) / Number(maxSupply) * 100));
+        if (mintProgressFill) mintProgressFill.style.width = `${progress}%`;
+        if (mintProgressLabel) mintProgressLabel.textContent = `${progress.toFixed(1)}% minted`;
+      }
     }
     const marketOnly = marketList && !activityFeed;
     const initialMarketLoad = marketOnly && !marketLastBlock;
     const listed = marketOnly ? marketListingState : new Map();
-    const latestBlock = await browserProvider.getBlockNumber();
     const fromBlock = CONFIG.deploymentBlock;
     const activityFromBlock = activityFeed && !marketList
       ? Math.max(fromBlock, latestBlock - 2000)
