@@ -57,6 +57,9 @@ const marketFloor = document.querySelector('#marketFloor');
 const marketListings = document.querySelector('#marketListings');
 const sellSection = document.querySelector('#sellSection');
 let currentListings = [];
+const marketListingState = new Map();
+let marketLastBlock = 0;
+let refreshInFlight = false;
 const activityFeed = document.querySelector('#activityFeed');
 const listButton = document.querySelector('#listButton');
 const durationOptions = document.querySelectorAll('.duration-option');
@@ -317,7 +320,7 @@ async function cancelListing(tokenId) {
 
 async function queryEvents(readContract, filter, fromBlock, toBlock) {
   const logs = [];
-  const chunkSize = activityFeed && !marketList ? 100 : 4000;
+  const chunkSize = activityFeed && !marketList ? 100 : 10000;
   for (let start = fromBlock; start <= toBlock; start += chunkSize + 1) {
     const end = Math.min(start + chunkSize, toBlock);
     logs.push(...await readContract.queryFilter(filter, start, end));
@@ -326,10 +329,16 @@ async function queryEvents(readContract, filter, fromBlock, toBlock) {
 }
 
 async function refreshLiveData() {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
   const readContract = getReadContract();
-  if (!marketList && !activityFeed && !mintedCount && !remainingCount && !freeMintedCount) return;
+  if (!marketList && !activityFeed && !mintedCount && !remainingCount && !freeMintedCount) {
+    refreshInFlight = false;
+    return;
+  }
   if (!readContract) {
     if (marketList) marketList.innerHTML = '<div class="market-empty"><span class="empty-mark">—</span><strong>Contract address required</strong><span>Set window.AGENT_PUNKS_ADDRESS or use ?contract=0x… after deploying.</span></div>';
+    refreshInFlight = false;
     return;
   }
   try {
@@ -346,29 +355,31 @@ async function refreshLiveData() {
       if (mintProgressFill) mintProgressFill.style.width = `${progress}%`;
       if (mintProgressLabel) mintProgressLabel.textContent = `${progress.toFixed(1)}% minted`;
     }
-    const listed = new Map();
+    const marketOnly = marketList && !activityFeed;
+    const listed = marketOnly ? marketListingState : new Map();
     const latestBlock = await browserProvider.getBlockNumber();
     const fromBlock = CONFIG.deploymentBlock;
     const activityFromBlock = activityFeed && !marketList
       ? Math.max(fromBlock, latestBlock - 2000)
       : fromBlock;
-    const activityFilters = activityFeed && !marketList
-      ? [readContract.filters.Minted(), readContract.filters.Sold()]
-      : [readContract.filters.Minted(), readContract.filters.Listed(), readContract.filters.ListingEdited(), readContract.filters.Sold(), readContract.filters.ListingCancelled()];
+    const eventFromBlock = marketOnly && marketLastBlock ? marketLastBlock + 1 : activityFromBlock;
     const [mintedLogs, listedLogs, editedLogs, soldLogs, cancelledLogs] = await Promise.all([
-      queryEvents(readContract, activityFilters[0], activityFromBlock, latestBlock),
-      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[1], activityFromBlock, latestBlock),
-      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[2], activityFromBlock, latestBlock),
-      activityFeed && !marketList ? queryEvents(readContract, activityFilters[1], activityFromBlock, latestBlock) : queryEvents(readContract, activityFilters[3], activityFromBlock, latestBlock),
-      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[4], activityFromBlock, latestBlock),
+      activityFeed ? queryEvents(readContract, readContract.filters.Minted(), activityFromBlock, latestBlock) : [],
+      marketList ? queryEvents(readContract, readContract.filters.Listed(), eventFromBlock, latestBlock) : [],
+      marketList ? queryEvents(readContract, readContract.filters.ListingEdited(), eventFromBlock, latestBlock) : [],
+      activityFeed ? queryEvents(readContract, readContract.filters.Sold(), activityFromBlock, latestBlock) : marketList ? queryEvents(readContract, readContract.filters.Sold(), eventFromBlock, latestBlock) : [],
+      marketList ? queryEvents(readContract, readContract.filters.ListingCancelled(), eventFromBlock, latestBlock) : [],
     ]);
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
+    if (marketOnly) marketLastBlock = latestBlock;
     renderListings([...listed.values()]);
     renderActivity([...mintedLogs, ...listedLogs, ...soldLogs].sort((a, b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 8));
   } catch (error) {
     if (marketList) marketList.innerHTML = `<div class="market-empty"><strong>Live data unavailable</strong><span>${error.shortMessage || error.message}</span></div>`;
     if (activityFeed) activityFeed.innerHTML = `<div class="feed-item"><span class="feed-badge">!</span><div><strong>Live activity unavailable</strong><span>${error.shortMessage || error.message}</span></div><code>RETRYING</code></div>`;
+  } finally {
+    refreshInFlight = false;
   }
 }
 
@@ -478,4 +489,4 @@ customDuration?.addEventListener('input', () => {
 });
 window.ethereum?.on('accountsChanged', () => window.location.reload());
 refreshLiveData();
-if (marketList || activityFeed || mintedCount || remainingCount || freeMintedCount) refreshTimer = window.setInterval(refreshLiveData, 5000);
+if (marketList || activityFeed || mintedCount || remainingCount || freeMintedCount) refreshTimer = window.setInterval(refreshLiveData, 2000);
