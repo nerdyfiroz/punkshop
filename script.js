@@ -17,6 +17,8 @@ const ABI = [
   'function freeMintClaimed(address account) view returns (bool)',
   'function MINT_PRICE() view returns (uint256)',
   'function totalMinted() view returns (uint256)',
+  'function freeMinted() view returns (uint256)',
+  'function MAX_SUPPLY() view returns (uint256)',
   'function tokenURI(uint256 tokenId) view returns (string)',
   'function listings(uint256 tokenId) view returns (address seller, uint256 price, uint256 expiresAt)',
   'event Minted(address indexed minter, uint256 indexed tokenId, bool freeMint, uint8 rarity)',
@@ -31,6 +33,10 @@ const walletLabel = document.querySelector('#walletLabel');
 const mineButton = document.querySelector('#mineButton');
 const toast = document.querySelector('#toast');
 const mintedCount = document.querySelector('#mintedCount');
+const remainingCount = document.querySelector('#remainingCount');
+const freeMintedCount = document.querySelector('#freeMintedCount');
+const mintProgressFill = document.querySelector('#mintProgressFill');
+const mintProgressLabel = document.querySelector('#mintProgressLabel');
 const promptButton = document.querySelector('#promptButton');
 const mintQuantity = document.querySelector('#mintQuantity');
 const marketList = document.querySelector('#marketList');
@@ -38,6 +44,7 @@ const activityFeed = document.querySelector('#activityFeed');
 const listButton = document.querySelector('#listButton');
 const durationOptions = document.querySelectorAll('.duration-option');
 const customDuration = document.querySelector('#customDuration');
+const directMintButton = document.querySelector('#directMintButton');
 let listingDuration = 1;
 let walletProvider;
 let browserProvider;
@@ -196,6 +203,20 @@ async function mint() {
   }
 }
 
+async function directMint() {
+  if (!account) return connectWallet();
+  if (!configured()) return showToast('Set window.AGENT_PUNKS_ADDRESS after deploying the contract');
+  try {
+    if (!(await getReadContract().hasAgentId(account))) {
+      showToast('Direct mint is unavailable: this contract requires an Agent ID');
+      return;
+    }
+    await mint();
+  } catch (error) {
+    showToast(`Direct mint check failed: ${error.shortMessage || error.message}`);
+  }
+}
+
 async function listPunk() {
   if (!account) return connectWallet();
   if (!configured()) return showToast('Set window.AGENT_PUNKS_ADDRESS after deploying the contract');
@@ -247,7 +268,7 @@ async function cancelListing(tokenId) {
 
 async function queryEvents(readContract, filter, fromBlock, toBlock) {
   const logs = [];
-  const chunkSize = 4000;
+  const chunkSize = activityFeed && !marketList ? 50000 : 4000;
   for (let start = fromBlock; start <= toBlock; start += chunkSize + 1) {
     const end = Math.min(start + chunkSize, toBlock);
     logs.push(...await readContract.queryFilter(filter, start, end));
@@ -257,7 +278,7 @@ async function queryEvents(readContract, filter, fromBlock, toBlock) {
 
 async function refreshLiveData() {
   const readContract = getReadContract();
-  if (!marketList && !activityFeed) return;
+  if (!marketList && !activityFeed && !mintedCount && !remainingCount && !freeMintedCount) return;
   if (!readContract) {
     if (marketList) marketList.innerHTML = '<div class="market-empty"><span class="empty-mark">—</span><strong>Contract address required</strong><span>Set window.AGENT_PUNKS_ADDRESS or use ?contract=0x… after deploying.</span></div>';
     return;
@@ -265,15 +286,29 @@ async function refreshLiveData() {
   try {
     const total = await readContract.totalMinted();
     if (mintedCount) mintedCount.textContent = Number(total).toLocaleString();
+    if (freeMintedCount) {
+      const freeMinted = await readContract.freeMinted();
+      freeMintedCount.textContent = Number(freeMinted).toLocaleString();
+    }
+    if (remainingCount) {
+      const maxSupply = await readContract.MAX_SUPPLY();
+      remainingCount.textContent = Number(maxSupply - total).toLocaleString();
+      const progress = Math.min(100, Math.max(0, Number(total) / Number(maxSupply) * 100));
+      if (mintProgressFill) mintProgressFill.style.width = `${progress}%`;
+      if (mintProgressLabel) mintProgressLabel.textContent = `${progress.toFixed(1)}% minted`;
+    }
     const listed = new Map();
     const latestBlock = await browserProvider.getBlockNumber();
     const fromBlock = CONFIG.deploymentBlock;
+    const activityFromBlock = activityFeed && !marketList
+      ? Math.max(fromBlock, latestBlock - 100000)
+      : fromBlock;
     const [mintedLogs, listedLogs, editedLogs, soldLogs, cancelledLogs] = await Promise.all([
-      queryEvents(readContract, readContract.filters.Minted(), fromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.Listed(), fromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.ListingEdited(), fromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.Sold(), fromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.ListingCancelled(), fromBlock, latestBlock),
+      queryEvents(readContract, readContract.filters.Minted(), activityFromBlock, latestBlock),
+      queryEvents(readContract, readContract.filters.Listed(), activityFromBlock, latestBlock),
+      queryEvents(readContract, readContract.filters.ListingEdited(), activityFromBlock, latestBlock),
+      queryEvents(readContract, readContract.filters.Sold(), activityFromBlock, latestBlock),
+      queryEvents(readContract, readContract.filters.ListingCancelled(), activityFromBlock, latestBlock),
     ]);
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
@@ -281,6 +316,7 @@ async function refreshLiveData() {
     renderActivity([...mintedLogs, ...listedLogs, ...soldLogs].sort((a, b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 8));
   } catch (error) {
     if (marketList) marketList.innerHTML = `<div class="market-empty"><strong>Live data unavailable</strong><span>${error.shortMessage || error.message}</span></div>`;
+    if (activityFeed) activityFeed.innerHTML = `<div class="feed-item"><span class="feed-badge">!</span><div><strong>Live activity unavailable</strong><span>${error.shortMessage || error.message}</span></div><code>RETRYING</code></div>`;
   }
 }
 
@@ -303,7 +339,10 @@ function renderListings(listings) {
 
 function renderActivity(logs) {
   if (!activityFeed) return;
-  if (!logs.length) return;
+  if (!logs.length) {
+    activityFeed.innerHTML = '<div class="feed-item"><span class="feed-badge">AP</span><div><strong>No minting activity yet</strong><span>New confirmed mints will appear automatically.</span></div><code>LIVE</code></div>';
+    return;
+  }
   activityFeed.innerHTML = logs.map((log) => {
     const isSale = log.fragment.name === 'Sold';
     const tokenId = log.args.tokenId.toString();
@@ -314,6 +353,7 @@ function renderActivity(logs) {
 
 walletButton?.addEventListener('click', connectWallet);
 mineButton?.addEventListener('click', mint);
+directMintButton?.addEventListener('click', directMint);
 mintQuantity?.addEventListener('input', updateMintLabel);
 listButton?.addEventListener('click', listPunk);
 promptButton?.addEventListener('click', async () => {
@@ -340,4 +380,4 @@ customDuration?.addEventListener('input', () => {
 });
 window.ethereum?.on('accountsChanged', () => window.location.reload());
 refreshLiveData();
-if (marketList || activityFeed) refreshTimer = window.setInterval(refreshLiveData, 15000);
+if (marketList || activityFeed || mintedCount || remainingCount || freeMintedCount) refreshTimer = window.setInterval(refreshLiveData, 5000);
