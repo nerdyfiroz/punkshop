@@ -3,17 +3,95 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Punks — 5,000 on-chain agents</title>
+  <title>Agent Punks — The Agent Lobby</title>
+  <link rel="icon" href="bandito_test_1024.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="lobby-page">
   <div class="noise"></div>
-  <header class="topbar"><a class="brand" href="index.html"><img class="brand-logo" src="bandito_test_1024.png" alt="Agent Punks"><span>AGENT PUNKS</span></a><nav class="nav-links"><a class="active" href="index.html">Home</a><a href="mint.html">Mint</a><a href="collection.html">Collection</a><a href="market.html">Market</a><a href="activity.html">Activity</a><a href="roadmap.html">Roadmap</a></nav><a class="wallet-button" href="mint.html">Mint with Agent ID <span></span></a></header>
-  <main>
-    <section class="home-hero page-shell"><div class="hero-copy"><div class="eyebrow"><span class="live-dot"></span> 5,000 ON-CHAIN AGENTS <span class="eyebrow-line"></span> BNB CHAIN</div><h1>Made for<br><em>the agent era.</em></h1><p class="hero-intro">Agent Punks is a collectible protocol for Agent ID holders. Claim one free punk, then mint more for 0.001 BNB each.</p><div class="hero-actions"><a class="primary-button" href="mint.html">Start minting <span></span></a><a class="text-link" href="market.html">Enter the market <span></span></a></div><div class="chain-note">AGENT ID REQUIRED <span class="separator">/</span> <a href="https://bscscan.com/address/0xFc8b714a1bEf212E0fea94Dd1bb3D472573c1d75" target="_blank" rel="noreferrer">Verified contract </a></div></div></section>
-    <section class="home-stats page-shell"><div><span>SUPPLY</span><strong>5,000</strong></div><div><span>FREE CLAIMS</span><strong>1,000</strong></div><div><span>PAID MINT</span><strong>0.001</strong><small>BNB / NFT</small></div><div><span>CHAIN</span><strong>BNB</strong></div></section>
-    <section class="home-links page-shell"><a href="mint.html"><span>01</span><div><h2>Mint your punk</h2><p>One free NFT per eligible Agent ID wallet. Mint up to 10 at once.</p></div><b></b></a><a href="collection.html"><span>02</span><div><h2>Explore the collection</h2><p>Browse traits, rarity, and the IPFS-pinned artwork.</p></div><b></b></a><a href="market.html"><span>03</span><div><h2>Trade on-chain</h2><p>List, buy, and delist directly through the marketplace contract.</p></div><b></b></a></section>
+  <header class="lobby-topbar">
+    <a class="lobby-brand" href="index.html">
+      <span class="lobby-brand-mark">✦</span>
+      <span>AGENT PUNKS</span>
+      <small>BNB CHAIN</small>
+    </a>
+    <div class="lobby-header-actions">
+      <button class="language-button" type="button">EN</button>
+      <button class="lobby-connect" id="walletButton" type="button"><span class="wallet-dot"></span><span id="walletLabel">Connect wallet</span></button>
+    </div>
+  </header>
+
+  <main class="lobby-main">
+    <section class="lobby-hero">
+      <div class="lobby-hero-copy">
+        <p class="lobby-kicker"><span></span> LIVE PROTOCOL · 5,000 AGENTS</p>
+        <h1>The Agent<br><em>Lobby</em></h1>
+        <p class="lobby-lead">Every punk has a signal. Collect the set, gear up, and make your mark on-chain.</p>
+      </div>
+      <div class="lobby-preview-grid" aria-label="Featured Agent Punks">
+        <article class="lobby-art-card art-amber">
+          <span>AGENT PUNK #001</span>
+          <img src="bandito_test_1024.png" alt="Agent Punk #001" />
+          <strong>THE BANDITO</strong>
+          <small>HONORARY · +50 SIGNAL</small>
+        </article>
+        <article class="lobby-art-card art-violet">
+          <span>AGENT PUNK #002</span>
+          <img src="commander_standard_body_1024.png" alt="Agent Punk #002" />
+          <strong>THE COMMANDER</strong>
+          <small>EPIC · +28 SIGNAL</small>
+        </article>
+      </div>
+    </section>
+
+    <section class="lobby-tiles" aria-label="Collection shortcuts">
+      <a class="lobby-tile tile-punks" href="collection.html">
+        <div class="tile-art-stack"><img src="bandito_test_1024.png" alt="" /><img src="meek_standard_body_1024.png" alt="" /><img src="commander_standard_body_1024.png" alt="" /></div>
+        <strong>Agent Punks</strong>
+        <small>5,000 unique agents</small>
+        <b>Explore →</b>
+      </a>
+      <a class="lobby-tile tile-gear" href="mint.html">
+        <div class="gear-symbol">✦</div>
+        <strong>Agent Access</strong>
+        <small>Agent ID holders</small>
+        <b>Mint now →</b>
+      </a>
+    </section>
+
+    <section class="lobby-stats" aria-label="Collection statistics">
+      <div><span>SUPPLY</span><strong>5,000</strong></div>
+      <div><span>FREE CLAIMS</span><strong>1,000</strong></div>
+      <div><span>SEASON SIGNAL</span><strong>1,746,534</strong></div>
+      <div><span>NETWORK</span><strong>BNB</strong></div>
+    </section>
+
+    <section class="lobby-events">
+      <div class="lobby-section-heading"><span>LIVE BOARD</span><small>UPDATES FROM THE PROTOCOL</small></div>
+      <div class="event-list">
+        <a class="event-row" href="mint.html"><i class="event-icon icon-mint">✦</i><div><span class="event-status"><b></b> LIVE</span><strong>Genesis Mint</strong><small>Claim your first Agent Punk with Agent ID</small></div><b class="event-action">Mint →</b></a>
+        <a class="event-row" href="market.html"><i class="event-icon icon-market">◇</i><div><span class="event-status"><b></b> LIVE</span><strong>Agent Market</strong><small>Buy, list, and trade on BNB Smart Chain</small></div><b class="event-action">Trade →</b></a>
+        <a class="event-row" href="activity.html"><i class="event-icon icon-activity">↻</i><div><span class="event-status"><b></b> LIVE</span><strong>Chain Activity</strong><small>Mint and sale events, straight from the chain</small></div><b class="event-action">View →</b></a>
+        <a class="event-row event-row-muted" href="roadmap.html"><i class="event-icon icon-roadmap">★</i><div><span class="event-status">COMING SOON</span><strong>Holder Utilities</strong><small>New layers for the agent economy</small></div><b class="event-action">Roadmap →</b></a>
+      </div>
+    </section>
   </main>
-  <footer class="footer page-shell"><span>5,000 agent-native NFTs on BNB Smart Chain.</span><div><a href="mint.html">Mint</a><a href="collection.html">Collection</a><a href="market.html">Market</a><a href="roadmap.html">Roadmap</a></div></footer>
+
+  <footer class="lobby-footer">
+    <span>AGENT PUNKS · COLLECTIBLE PROTOCOL</span>
+    <div><a href="roadmap.html">Docs</a><a href="https://bscscan.com/address/0xFc8b714a1bEf212E0fea94Dd1bb3D472573c1d75" target="_blank" rel="noreferrer">Contract ↗</a></div>
+  </footer>
+
+  <nav class="lobby-bottom-nav" aria-label="Primary navigation">
+    <a class="active" href="index.html"><span>⌂</span>Home</a>
+    <a href="market.html"><span>◇</span>Market</a>
+    <a href="mint.html"><span>＋</span>Mint</a>
+    <a href="activity.html"><span>◈</span>Activity</a>
+    <a href="roadmap.html"><span>•••</span>More</a>
+  </nav>
+  <div class="toast" id="toast" role="status"></div>
+  <script>window.AGENT_PUNKS_ADDRESS="0xFc8b714a1bEf212E0fea94Dd1bb3D472573c1d75";</script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
