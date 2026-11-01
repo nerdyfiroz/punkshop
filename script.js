@@ -55,9 +55,13 @@ const marketMinPrice = document.querySelector('#marketMinPrice');
 const marketMaxPrice = document.querySelector('#marketMaxPrice');
 const marketFloor = document.querySelector('#marketFloor');
 const marketListings = document.querySelector('#marketListings');
+const marketVolume = document.querySelector('#marketVolume');
+const marketBuyCount = document.querySelector('#marketBuyCount');
+const marketSellCount = document.querySelector('#marketSellCount');
 const sellSection = document.querySelector('#sellSection');
 let currentListings = [];
 const marketListingState = new Map();
+const marketStatsState = { volume: 0n, buys: 0, sells: 0 };
 let marketLastBlock = 0;
 let refreshInFlight = false;
 const activityFeed = document.querySelector('#activityFeed');
@@ -363,6 +367,7 @@ async function refreshLiveData() {
       if (mintProgressLabel) mintProgressLabel.textContent = `${progress.toFixed(1)}% minted`;
     }
     const marketOnly = marketList && !activityFeed;
+    const initialMarketLoad = marketOnly && !marketLastBlock;
     const listed = marketOnly ? marketListingState : new Map();
     const latestBlock = await browserProvider.getBlockNumber();
     const fromBlock = CONFIG.deploymentBlock;
@@ -387,6 +392,18 @@ async function refreshLiveData() {
     ]);
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
+    if (marketOnly) {
+      if (initialMarketLoad) {
+        marketStatsState.sells = listedLogs.length;
+        marketStatsState.buys = soldLogs.length;
+        marketStatsState.volume = soldLogs.reduce((total, log) => total + log.args.price, 0n);
+      } else {
+        marketStatsState.sells += listedLogs.length;
+        marketStatsState.buys += soldLogs.length;
+        marketStatsState.volume += soldLogs.reduce((total, log) => total + log.args.price, 0n);
+      }
+      renderMarketStats();
+    }
     if (marketOnly) marketLastBlock = latestBlock;
     renderListings([...listed.values()]);
     renderActivity([...mintedLogs, ...listedLogs, ...soldLogs].sort((a, b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 8));
@@ -395,6 +412,12 @@ async function refreshLiveData() {
     if (activityFeed) activityFeed.innerHTML = `<div class="feed-item"><span class="feed-badge">!</span><div><strong>Live activity unavailable</strong><span>${error.shortMessage || error.message}</span></div><code>RETRYING</code></div>`;
   } finally {
     refreshInFlight = false;
+  }
+
+  function renderMarketStats() {
+    if (marketVolume) marketVolume.textContent = Number(ethers.formatEther(marketStatsState.volume)).toLocaleString(undefined, { maximumFractionDigits: 4 });
+    if (marketBuyCount) marketBuyCount.textContent = marketStatsState.buys.toLocaleString();
+    if (marketSellCount) marketSellCount.textContent = marketStatsState.sells.toLocaleString();
   }
 }
 
