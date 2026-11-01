@@ -53,6 +53,11 @@
  .home-links>a:hover b{transform:translate(5px,-5px)}
  .hero-art-type{background:radial-gradient(circle at center,rgba(217,95,37,.12),transparent 58%);animation:softPulse 5s ease-in-out infinite}
  .hero-glyph{animation:float 5s ease-in-out infinite,glowPulse 3.5s ease-in-out infinite}
+ .element-market-button{display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;padding:9px 12px;border:1px solid rgba(217,95,37,.65);background:rgba(217,95,37,.08);color:var(--cream);font:10px var(--mono);letter-spacing:.04em;text-decoration:none;transition:background .2s ease,border-color .2s ease,transform .2s ease}
+ .element-market-button:hover{border-color:var(--orange);background:rgba(217,95,37,.18);transform:translateY(-2px)}
+ .element-market-button img{width:18px;height:18px;object-fit:contain}
+ .element-market-button b{color:var(--orange);font-size:13px;font-weight:400}
+ @media(max-width:520px){.element-market-button{margin-bottom:12px}}
  .live-dot,.wallet-dot{animation:statusPulse 1.8s ease-in-out infinite}
  .collection-card,.roadmap-grid article,.rules-grid article,.terminal-card,.mint-panel{transition:transform .35s ease,box-shadow .35s ease,background .35s ease}
  .collection-card:hover,.roadmap-grid article:hover,.rules-grid article:hover,.terminal-card:hover,.mint-panel:hover{transform:translateY(-5px);box-shadow:0 15px 32px rgba(38,31,20,.1)}
