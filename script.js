@@ -321,14 +321,43 @@ async function listPunk() {
 
 async function buyPunk(tokenId, price) {
   if (!account) return connectWallet();
+  if (!configured()) return showToast('Set window.AGENT_PUNKS_ADDRESS after deploying the contract');
+  const button = marketList?.querySelector(`.buy-listing[data-token="${tokenId}"]`);
   try {
-    const tx = await getWriteContract().buy(tokenId, { value: price });
+    if (walletProvider) await ensureBsc();
+    const readContract = getReadContract();
+    const listing = await readContract.listings(tokenId);
+    if (listing.seller === ethers.ZeroAddress) {
+      showToast(`Punk #${tokenId} is no longer listed`);
+      await refreshLiveData();
+      return;
+    }
+    if (listing.price.toString() !== price.toString()) {
+      showToast(`Punk #${tokenId} price changed — refresh and try again`);
+      await refreshLiveData();
+      return;
+    }
+    const writeContract = getWriteContract();
+    if (!writeContract) return showToast('Reconnect your wallet before buying');
+    const value = listing.price;
+    await writeContract.buy.estimateGas(tokenId, { value });
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Confirm in wallet...';
+    }
+    const tx = await writeContract.buy(tokenId, { value });
     showToast('Purchase submitted — waiting for confirmation');
     await tx.wait();
     showToast(`Punk #${tokenId} purchased`);
     await refreshLiveData();
   } catch (error) {
-    showToast(`Purchase failed: ${error.shortMessage || error.message}`);
+    const reason = error.shortMessage || error.reason || error.info?.error?.message || error.message;
+    showToast(`Purchase failed: ${reason || 'Transaction rejected'}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = 'Buy <span></span>';
+    }
   }
 }
 
