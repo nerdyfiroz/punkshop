@@ -30,7 +30,7 @@
  .feature-image h2{bottom:30px;margin:0;font-size:28px;font-weight:500}
  .feature-image p{bottom:8px;margin:0;color:var(--cream);font:10px var(--mono)}
  .collection-details{padding-top:20px;padding-bottom:80px}.details-intro{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:45px 0;border-top:1px solid var(--line)}.details-intro h2{font-size:38px;line-height:1.05;font-weight:500;margin:0}.details-intro h2 em{color:var(--orange);font-style:normal}.details-intro p{max-width:470px;color:var(--muted);line-height:1.7;margin:0}.details-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.details-stats div{padding:22px 18px 22px 0;border-right:1px solid var(--line)}.details-stats div:not(:first-child){padding-left:18px}.details-stats span,.details-stats small{display:block;color:var(--muted);font:10px var(--mono);letter-spacing:.07em}.details-stats strong{display:block;color:var(--cream);font:500 24px var(--mono);margin:13px 0 7px}.trait-list{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:45px}.trait-list article{background:var(--panel);padding:24px;min-height:180px}.trait-list article>span{color:var(--orange);font:10px var(--mono)}.trait-list h3{font-size:20px;font-weight:500;margin:28px 0 10px}.trait-list p{color:var(--muted);line-height:1.6;margin:0}@media(max-width:800px){.details-intro{grid-template-columns:1fr}.details-stats{grid-template-columns:1fr 1fr}.details-stats div{border-bottom:1px solid var(--line)}.trait-list{grid-template-columns:1fr}}
- @media(max-width:520px){.element-nav-button span{display:none}.element-nav-button{padding:5px}.topbar{gap:12px;overflow:hidden;padding-left:16px; padding-right:16px}.brand{flex:0 0 auto}.nav-links{display:flex;gap:16px;min-width:0;overflow-x:auto;flex:1;padding:4px 0;scrollbar-width:none}.nav-links::-webkit-scrollbar{display:none}.nav-links a{flex:0 0 auto}.wallet-button{flex:0 0 auto;padding:10px 11px;font-size:10px}.wallet-button span:last-child{display:none}}
+ @media(max-width:520px){.element-nav-button span{display:none}.element-nav-button{padding:0}.topbar{gap:12px;overflow:hidden;padding-left:16px;  padding-right:16px}.brand{flex:0 0 auto}.nav-links{display:flex;gap:16px;min-width:0;overflow-x:auto;flex:1;padding:4px 0;scrollbar-width:none}.nav-links::-webkit-scrollbar{display:none}.nav-links a{flex:0 0 auto}.wallet-button{flex:0 0 auto;padding:10px 11px;font-size:10px}.wallet-button span:last-child{display:none}}
 
  /* Off-white editorial theme and shared motion layer. */
  :root{--bg:#f4f0e8;--panel:#fbf9f4;--panel-2:#ebe6dc;--line:#d5cec2;--muted:#77736c;--cream:#171817;--orange:#d95f25;--orange-bright:#ef7435;--green:#477454}
@@ -43,11 +43,11 @@
  .nav-links a{position:relative;color:var(--muted)}
  .nav-links a::after{content:'';position:absolute;left:0;right:100%;bottom:-7px;height:1px;background:var(--orange);transition:right .25s ease}
  .nav-links a:hover::after,.nav-links a.active::after{right:0}
- .element-nav-button{display:inline-flex!important;align-items:center;gap:5px;padding:6px 8px;border:1px solid rgba(217,95,37,.7);color:var(--cream)!important;text-decoration:none;font-size:9px!important;letter-spacing:.03em}
+ .element-nav-button{display:inline-flex!important;align-items:center;gap:5px;padding:0;color:var(--muted)!important;text-decoration:none;font-size:inherit!important;letter-spacing:inherit}
  .element-nav-button::after{display:none!important}
- .element-nav-button:hover{background:rgba(217,95,37,.14);border-color:var(--orange)}
- .element-nav-button img{width:14px;height:14px;object-fit:contain}
- .element-nav-button b{color:var(--orange);font-size:11px;font-weight:400}
+ .element-nav-button:hover{background:transparent;color:var(--orange)!important}
+ .element-nav-button img{width:13px;height:13px;object-fit:contain}
+ .element-nav-button b{color:var(--orange);font-size:inherit;font-weight:400}
  .wallet-button,.primary-button,.mine-button{box-shadow:4px 4px 0 rgba(23,24,23,.12);transition:transform .25s ease,background .25s ease,box-shadow .25s ease}
  .wallet-button:hover,.primary-button:hover,.mine-button:hover{box-shadow:7px 7px 0 rgba(23,24,23,.14);transform:translate(-2px,-3px)}
  .home-hero,.subpage-hero,.market-heading{animation:contentReveal .8s .08s cubic-bezier(.2,.8,.2,1) both}
