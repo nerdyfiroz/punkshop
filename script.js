@@ -62,6 +62,7 @@ const sellSection = document.querySelector('#sellSection');
 let currentListings = [];
 const marketListingState = new Map();
 const marketStatsState = { volume: 0n, buys: 0, sells: 0 };
+const marketEventKeys = new Set();
 let marketLastBlock = 0;
 let refreshInFlight = false;
 const activityFeed = document.querySelector('#activityFeed');
@@ -347,7 +348,21 @@ async function buyPunk(tokenId, price) {
     }
     const tx = await writeContract.buy(tokenId, { value });
     showToast('Purchase submitted — waiting for confirmation');
-    await tx.wait();
+    const receipt = await tx.wait();
+    const confirmedEvents = receipt.logs
+      .map((log) => {
+        try {
+          const parsed = writeContract.interface.parseLog(log);
+          return parsed ? Object.assign(parsed, { eventKey: `${receipt.hash}:${log.index}:${parsed.name}` }) : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    recordMarketStats(confirmedEvents);
+    marketListingState.delete(tokenId.toString());
+    renderMarketStats();
+    renderListings([...marketListingState.values()]);
     showToast(`Punk #${tokenId} purchased`);
     await refreshLiveData();
   } catch (error) {
@@ -386,7 +401,30 @@ async function queryVercelMarketEvents(fromBlock, toBlock, readContract) {
   const response = await fetch(`/api/market-events?fromBlock=${fromBlock}&toBlock=${toBlock}`, { cache: 'no-store' });
   if (!response.ok) throw new Error('Market event API unavailable');
   const body = await response.json();
-  return body.logs.map((log) => readContract.interface.parseLog({ topics: log.topics, data: log.data })).filter(Boolean);
+  return body.logs.map((log) => {
+    const parsed = readContract.interface.parseLog({ topics: log.topics, data: log.data });
+    return parsed ? Object.assign(parsed, { eventKey: `${log.transactionHash}:${log.logIndex}:${parsed.name}` }) : null;
+  }).filter(Boolean);
+}
+
+function recordMarketStats(logs, reset = false) {
+  if (reset) {
+    marketStatsState.sells = 0;
+    marketStatsState.buys = 0;
+    marketStatsState.volume = 0n;
+    marketEventKeys.clear();
+  }
+  logs.forEach((log) => {
+    if (log.name !== 'Listed' && log.name !== 'Sold') return;
+    const key = log.eventKey || `${log.name}:${log.args.tokenId.toString()}:${log.args.price?.toString() || ''}`;
+    if (marketEventKeys.has(key)) return;
+    marketEventKeys.add(key);
+    if (log.name === 'Listed') marketStatsState.sells++;
+    if (log.name === 'Sold') {
+      marketStatsState.buys++;
+      marketStatsState.volume += log.args.price;
+    }
+  });
 }
 
 async function refreshLiveData() {
@@ -443,15 +481,7 @@ async function refreshLiveData() {
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
     if (marketOnly) {
-      if (initialMarketLoad) {
-        marketStatsState.sells = listedLogs.length;
-        marketStatsState.buys = soldLogs.length;
-        marketStatsState.volume = soldLogs.reduce((total, log) => total + log.args.price, 0n);
-      } else {
-        marketStatsState.sells += listedLogs.length;
-        marketStatsState.buys += soldLogs.length;
-        marketStatsState.volume += soldLogs.reduce((total, log) => total + log.args.price, 0n);
-      }
+      recordMarketStats([...listedLogs, ...soldLogs], initialMarketLoad);
       renderMarketStats();
     }
     if (marketOnly) marketLastBlock = latestBlock;
