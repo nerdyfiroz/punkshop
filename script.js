@@ -80,6 +80,18 @@ let contract;
 let account = '';
 let refreshTimer;
 
+const marketTabs = document.querySelector('.market-tabs');
+if (marketTabs && !marketTabs.querySelector('[data-element-market]')) {
+  const elementLink = document.createElement('a');
+  elementLink.className = 'market-tab';
+  elementLink.href = 'https://element.market/collections/agent-punks-5';
+  elementLink.target = '_blank';
+  elementLink.rel = 'noopener noreferrer';
+  elementLink.dataset.elementMarket = 'true';
+  elementLink.textContent = 'Element';
+  marketTabs.append(elementLink);
+}
+
 const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
 
 const marketPrompts = {
