@@ -46,7 +46,7 @@ let contract;
 let account = '';
 let refreshTimer;
 
-const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint exactly one free Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0xFc8b714a1bEf212E0fea94Dd1bb3D472573c1d75. First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
+const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
 
 function showToast(message) {
   if (!toast) return;
