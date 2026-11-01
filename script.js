@@ -193,19 +193,40 @@ async function connectWallet() {
   try {
     walletProvider = window.ethereum;
     await walletProvider.request({ method: 'eth_requestAccounts' });
-    await ensureBsc();
-    browserProvider = new ethers.BrowserProvider(walletProvider);
-    signer = await browserProvider.getSigner();
-    account = await signer.getAddress();
-    contract = new ethers.Contract(CONFIG.contractAddress, ABI, signer);
-    walletLabel.textContent = shortenAddress(account);
-    walletButton.querySelector('.wallet-dot').style.background = '#f47d38';
-    updateMintLabel();
+    await syncWalletAccount(true);
     showToast(configured() ? 'Agentic Wallet connected on BNB Smart Chain' : 'Wallet connected — add the deployed contract address');
-    await refreshLiveData();
   } catch (error) {
     showToast(error.code === 4001 ? 'Wallet connection cancelled' : `Wallet connection failed: ${error.shortMessage || error.message}`);
   }
+}
+
+async function syncWalletAccount(switchNetwork = false) {
+  if (!walletProvider) return;
+  const accounts = await walletProvider.request({ method: 'eth_accounts' });
+  if (!accounts.length) {
+    disconnectWallet();
+    return;
+  }
+  if (switchNetwork) await ensureBsc();
+  browserProvider = new ethers.BrowserProvider(walletProvider);
+  signer = await browserProvider.getSigner();
+  account = accounts[0];
+  contract = configured() ? new ethers.Contract(CONFIG.contractAddress, ABI, signer) : null;
+  walletLabel.textContent = shortenAddress(account);
+  const walletDot = walletButton?.querySelector('.wallet-dot');
+  if (walletDot) walletDot.style.background = '#f47d38';
+  updateMintLabel();
+  await refreshLiveData();
+}
+
+function disconnectWallet() {
+  account = '';
+  signer = null;
+  contract = null;
+  walletLabel && (walletLabel.textContent = 'Connect wallet');
+  const walletDot = walletButton?.querySelector('.wallet-dot');
+  if (walletDot) walletDot.style.background = '';
+  updateMintLabel();
 }
 
 async function updateMintLabel() {
@@ -547,6 +568,12 @@ customDuration?.addEventListener('input', () => {
     listingDuration = days;
   }
 });
-window.ethereum?.on('accountsChanged', () => window.location.reload());
+if (window.ethereum) {
+  walletProvider = window.ethereum;
+  walletProvider.on('accountsChanged', () => syncWalletAccount());
+  walletProvider.on('disconnect', disconnectWallet);
+  walletProvider.on('chainChanged', () => syncWalletAccount());
+  syncWalletAccount().catch(() => disconnectWallet());
+}
 refreshLiveData();
 if (marketList || activityFeed || mintedCount || remainingCount || freeMintedCount) refreshTimer = window.setInterval(refreshLiveData, 2000);
