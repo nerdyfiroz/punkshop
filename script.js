@@ -1,7 +1,13 @@
 const CONFIG = {
   chainId: '0x38',
   chainName: 'BNB Smart Chain',
-  rpcUrl: 'https://bsc-dataseed.binance.org',
+  rpcUrls: [
+    'https://bsc.publicnode.com',
+    'https://bsc-rpc.publicnode.com',
+    'https://bsc-dataseed.binance.org',
+    'https://bsc-dataseed1.defibit.io',
+    'https://bsc-dataseed1.ninicoin.io',
+  ],
   explorer: 'https://bscscan.com',
   deploymentBlock: 130890669,
   contractAddress: window.AGENT_PUNKS_ADDRESS || new URLSearchParams(window.location.search).get('contract') || '',
@@ -54,6 +60,14 @@ let account = '';
 let refreshTimer;
 
 const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
+
+function getAgentPrompt() {
+  const requestedQuantity = Number(mintQuantity?.value);
+  const quantity = Number.isInteger(requestedQuantity) && requestedQuantity >= 1 && requestedQuantity <= 10
+    ? requestedQuantity
+    : 1;
+  return `${agentPrompt} I want to mint exactly ${quantity} Agent Punks NFT${quantity === 1 ? '' : 's'}.`;
+}
 
 function initLobbyCarousel() {
   const carousel = document.querySelector('#lobbyCarousel');
@@ -113,7 +127,7 @@ function configured() {
 
 function getReadContract() {
   if (!configured()) return null;
-  browserProvider ||= new ethers.JsonRpcProvider(CONFIG.rpcUrl);
+  browserProvider ||= new ethers.JsonRpcProvider(CONFIG.rpcUrls[0], 56, { staticNetwork: true });
   return new ethers.Contract(CONFIG.contractAddress, ABI, browserProvider);
 }
 
@@ -268,7 +282,7 @@ async function cancelListing(tokenId) {
 
 async function queryEvents(readContract, filter, fromBlock, toBlock) {
   const logs = [];
-  const chunkSize = activityFeed && !marketList ? 50000 : 4000;
+  const chunkSize = activityFeed && !marketList ? 100 : 4000;
   for (let start = fromBlock; start <= toBlock; start += chunkSize + 1) {
     const end = Math.min(start + chunkSize, toBlock);
     logs.push(...await readContract.queryFilter(filter, start, end));
@@ -301,14 +315,17 @@ async function refreshLiveData() {
     const latestBlock = await browserProvider.getBlockNumber();
     const fromBlock = CONFIG.deploymentBlock;
     const activityFromBlock = activityFeed && !marketList
-      ? Math.max(fromBlock, latestBlock - 100000)
+      ? Math.max(fromBlock, latestBlock - 2000)
       : fromBlock;
+    const activityFilters = activityFeed && !marketList
+      ? [readContract.filters.Minted(), readContract.filters.Sold()]
+      : [readContract.filters.Minted(), readContract.filters.Listed(), readContract.filters.ListingEdited(), readContract.filters.Sold(), readContract.filters.ListingCancelled()];
     const [mintedLogs, listedLogs, editedLogs, soldLogs, cancelledLogs] = await Promise.all([
-      queryEvents(readContract, readContract.filters.Minted(), activityFromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.Listed(), activityFromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.ListingEdited(), activityFromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.Sold(), activityFromBlock, latestBlock),
-      queryEvents(readContract, readContract.filters.ListingCancelled(), activityFromBlock, latestBlock),
+      queryEvents(readContract, activityFilters[0], activityFromBlock, latestBlock),
+      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[1], activityFromBlock, latestBlock),
+      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[2], activityFromBlock, latestBlock),
+      activityFeed && !marketList ? queryEvents(readContract, activityFilters[1], activityFromBlock, latestBlock) : queryEvents(readContract, activityFilters[3], activityFromBlock, latestBlock),
+      activityFeed && !marketList ? [] : queryEvents(readContract, activityFilters[4], activityFromBlock, latestBlock),
     ]);
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
@@ -358,7 +375,7 @@ mintQuantity?.addEventListener('input', updateMintLabel);
 listButton?.addEventListener('click', listPunk);
 promptButton?.addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(agentPrompt);
+    await navigator.clipboard.writeText(getAgentPrompt());
     showToast('Agent ID mint prompt copied');
   } catch {
     showToast('Select and copy the prompt from the browser');
