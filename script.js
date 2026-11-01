@@ -328,6 +328,13 @@ async function queryEvents(readContract, filter, fromBlock, toBlock) {
   return logs;
 }
 
+async function queryVercelMarketEvents(fromBlock, toBlock, readContract) {
+  const response = await fetch(`/api/market-events?fromBlock=${fromBlock}&toBlock=${toBlock}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('Market event API unavailable');
+  const body = await response.json();
+  return body.logs.map((log) => readContract.interface.parseLog({ topics: log.topics, data: log.data })).filter(Boolean);
+}
+
 async function refreshLiveData() {
   if (refreshInFlight) return;
   refreshInFlight = true;
@@ -363,12 +370,20 @@ async function refreshLiveData() {
       ? Math.max(fromBlock, latestBlock - 2000)
       : fromBlock;
     const eventFromBlock = marketOnly && marketLastBlock ? marketLastBlock + 1 : activityFromBlock;
+    const marketEvents = marketList && marketLastBlock
+      ? queryVercelMarketEvents(eventFromBlock, latestBlock, readContract).catch(() => Promise.all([
+        queryEvents(readContract, readContract.filters.Listed(), eventFromBlock, latestBlock),
+        queryEvents(readContract, readContract.filters.ListingEdited(), eventFromBlock, latestBlock),
+        queryEvents(readContract, readContract.filters.Sold(), eventFromBlock, latestBlock),
+        queryEvents(readContract, readContract.filters.ListingCancelled(), eventFromBlock, latestBlock),
+      ]).then((groups) => groups.flat()))
+      : null;
     const [mintedLogs, listedLogs, editedLogs, soldLogs, cancelledLogs] = await Promise.all([
       activityFeed ? queryEvents(readContract, readContract.filters.Minted(), activityFromBlock, latestBlock) : [],
-      marketList ? queryEvents(readContract, readContract.filters.Listed(), eventFromBlock, latestBlock) : [],
-      marketList ? queryEvents(readContract, readContract.filters.ListingEdited(), eventFromBlock, latestBlock) : [],
-      activityFeed ? queryEvents(readContract, readContract.filters.Sold(), activityFromBlock, latestBlock) : marketList ? queryEvents(readContract, readContract.filters.Sold(), eventFromBlock, latestBlock) : [],
-      marketList ? queryEvents(readContract, readContract.filters.ListingCancelled(), eventFromBlock, latestBlock) : [],
+      marketList ? (marketEvents ? marketEvents.then((logs) => logs.filter((log) => log.name === 'Listed')) : queryEvents(readContract, readContract.filters.Listed(), eventFromBlock, latestBlock)) : [],
+      marketList ? (marketEvents ? marketEvents.then((logs) => logs.filter((log) => log.name === 'ListingEdited')) : queryEvents(readContract, readContract.filters.ListingEdited(), eventFromBlock, latestBlock)) : [],
+      activityFeed ? queryEvents(readContract, readContract.filters.Sold(), activityFromBlock, latestBlock) : marketList ? (marketEvents ? marketEvents.then((logs) => logs.filter((log) => log.name === 'Sold')) : queryEvents(readContract, readContract.filters.Sold(), eventFromBlock, latestBlock)) : [],
+      marketList ? (marketEvents ? marketEvents.then((logs) => logs.filter((log) => log.name === 'ListingCancelled')) : queryEvents(readContract, readContract.filters.ListingCancelled(), eventFromBlock, latestBlock)) : [],
     ]);
     [...listedLogs, ...editedLogs].forEach((log) => listed.set(log.args.tokenId.toString(), { tokenId: log.args.tokenId, seller: log.args.seller, price: log.args.price }));
     [...soldLogs, ...cancelledLogs].forEach((log) => listed.delete(log.args.tokenId.toString()));
@@ -418,17 +433,39 @@ function renderListings(listings) {
     marketList.innerHTML = '<div class="market-empty"><span class="empty-mark">—</span><strong>No matching listings</strong><span>Try clearing a filter or check back after the next chain refresh.</span></div>';
     return;
   }
-  marketList.innerHTML = filtered.map((listing) => {
+  marketList.innerHTML = `<div class="market-card-grid">${filtered.map((listing) => {
     const price = ethers.formatEther(listing.price);
     const ownerAction = account && listing.seller.toLowerCase() === account.toLowerCase()
       ? `<button class="secondary-button cancel-listing" data-token="${listing.tokenId}">Delist</button>`
       : `<button class="mine-button buy-listing" data-token="${listing.tokenId}" data-price="${listing.price}">Buy <span></span></button>`;
     const promptAction = `<button class="prompt-button buy-prompt" data-token="${listing.tokenId}" data-price="${price}" type="button">Copy buy prompt</button>`;
-    return `<article class="market-row"><div><strong>Punk #${listing.tokenId}</strong><span>${shortenAddress(listing.seller)}</span></div><b>${price} BNB</b><div>${ownerAction}${promptAction}</div></article>`;
-  }).join('');
+    return `<article class="market-card" data-token-card="${listing.tokenId}"><div class="market-card-art"><span>APUNK #${listing.tokenId}</span><div class="market-art-placeholder">✦</div></div><div class="market-card-info"><div><strong>Punk #${listing.tokenId}</strong><span>${shortenAddress(listing.seller)}</span></div><b>${price} BNB</b></div><div class="market-card-actions">${ownerAction}${promptAction}</div></article>`;
+  }).join('')}</div>`;
   marketList.querySelectorAll('.buy-listing').forEach((button) => button.addEventListener('click', () => buyPunk(button.dataset.token, button.dataset.price)));
   marketList.querySelectorAll('.cancel-listing').forEach((button) => button.addEventListener('click', () => cancelListing(button.dataset.token)));
   marketList.querySelectorAll('.buy-prompt').forEach((button) => button.addEventListener('click', () => copyPrompt(`${marketPrompts.buy} I want to buy token ID ${button.dataset.token} for ${button.dataset.price} BNB.`, 'Buy prompt copied')));
+  loadListingImages(filtered);
+}
+
+function resolveMetadataUri(uri) {
+  if (uri.startsWith('ipfs://')) return `https://ipfs.io/ipfs/${uri.slice(7)}`;
+  return uri;
+}
+
+async function loadListingImages(listings) {
+  const readContract = getReadContract();
+  await Promise.all(listings.map(async (listing) => {
+    try {
+      const uri = resolveMetadataUri(await readContract.tokenURI(listing.tokenId));
+      const response = await fetch(uri);
+      const metadata = await response.json();
+      const image = metadata.image ? resolveMetadataUri(metadata.image) : '';
+      const card = marketList.querySelector(`[data-token-card="${listing.tokenId}"] .market-card-art`);
+      if (card && image) card.innerHTML = `<img src="${image}" alt="Agent Punk #${listing.tokenId}" loading="lazy"><span>APUNK #${listing.tokenId}</span>`;
+    } catch {
+      // Keep the visual placeholder when token metadata is unavailable.
+    }
+  }));
 }
 
 function renderActivity(logs) {
