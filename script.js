@@ -92,6 +92,19 @@ if (marketTabs && !marketTabs.querySelector('[data-element-market]')) {
   marketTabs.append(elementLink);
 }
 
+document.querySelectorAll('.nav-links, .lobby-nav').forEach((navigation) => {
+  const marketLink = [...navigation.querySelectorAll('a')].find((link) => link.getAttribute('href') === 'market.html');
+  if (!marketLink || navigation.querySelector('[data-element-nav]')) return;
+  const elementLink = document.createElement('a');
+  elementLink.className = 'element-nav-button';
+  elementLink.href = 'https://element.market/collections/agent-punks-5';
+  elementLink.target = '_blank';
+  elementLink.rel = 'noopener noreferrer';
+  elementLink.dataset.elementNav = 'true';
+  elementLink.innerHTML = '<img src="https://static.element.bid/resource/images/favicon-32.png" alt=""> <span>Element</span><b>↗</b>';
+  marketLink.insertAdjacentElement('afterend', elementLink);
+});
+
 const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
 
 const marketPrompts = {
