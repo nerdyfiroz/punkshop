@@ -48,6 +48,47 @@ let refreshTimer;
 
 const agentPrompt = 'Open the Agent Punks website at https://www.punksnft.store and read the mint guide. Help me mint Agent Punks NFT with my Binance Agentic Wallet on BNB Smart Chain. The NFT contract address is 0x01d75929fB14C4094A35fC16DDaB91F108614720 . First check my Agent ID eligibility, wallet balance, contract status, gas estimate, network, and Developer Mode. Show me the exact transaction preview, including contract address, function, quantity, value, gas estimate, and recipient, then wait for my explicit approval before sending. Use English, never guess a token ID or contract address, and never treat a pending transaction as confirmed.';
 
+function initLobbyCarousel() {
+  const carousel = document.querySelector('#lobbyCarousel');
+  if (!carousel) return;
+  const track = carousel.querySelector('.lobby-carousel-track');
+  const slides = [...carousel.querySelectorAll('.lobby-slide')];
+  const count = carousel.querySelector('.lobby-carousel-count');
+  const previous = carousel.querySelector('[data-carousel-prev]');
+  const next = carousel.querySelector('[data-carousel-next]');
+  let current = 0;
+  let timer;
+
+  function showSlide(index, direction = 1) {
+    current = (index + slides.length) % slides.length;
+    track.style.transform = `translateX(-${current * 100}%)`;
+    slides.forEach((slide, slideIndex) => {
+      slide.classList.toggle('is-active', slideIndex === current);
+      slide.classList.toggle('is-entering', slideIndex === current);
+      slide.dataset.direction = direction > 0 ? 'next' : 'previous';
+    });
+    count.textContent = `${String(current + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+  }
+
+  function restartTimer() {
+    window.clearInterval(timer);
+    timer = window.setInterval(() => showSlide(current + 1), 5000);
+  }
+
+  previous?.addEventListener('click', () => {
+    showSlide(current - 1, -1);
+    restartTimer();
+  });
+  next?.addEventListener('click', () => {
+    showSlide(current + 1);
+    restartTimer();
+  });
+  showSlide(0);
+  restartTimer();
+}
+
+initLobbyCarousel();
+
 function showToast(message) {
   if (!toast) return;
   toast.textContent = message;
